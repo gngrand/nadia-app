@@ -237,11 +237,30 @@
           </div>
 
           <div class="space-y-1.5">
-            <div class="flex justify-between text-xs">
-              <label for="settingSpeechRate" class="text-white/70">ความเร็วเสียงพูดตอบกลับ (TTS)</label>
-              <span id="speechRateVal" class="font-mono text-emerald-400">1.05x</span>
+            <div class="flex items-center justify-between text-xs">
+              <label for="settingVoiceSelect" class="text-white/70">เลือกเสียงพูดของ Nadia (แนะนำ Premwadee / Kanya / Google ไทย)</label>
+              <button type="button" id="testVoiceBtn" class="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition text-[11px]">ทดสอบเสียง</button>
             </div>
-            <input id="settingSpeechRate" type="range" min="0.8" max="1.35" step="0.05" value="1.05" class="w-full accent-emerald-400" />
+            <select id="settingVoiceSelect" class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-neutral-950 text-xs sm:text-sm text-white outline-none focus:border-emerald-400/60">
+              <option value="">เลือกเสียงผู้หญิงภาษาไทยอัตโนมัติ</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <div class="flex justify-between text-xs">
+                <label for="settingSpeechRate" class="text-white/70">ความเร็วเสียงพูด</label>
+                <span id="speechRateVal" class="font-mono text-emerald-400">1.05x</span>
+              </div>
+              <input id="settingSpeechRate" type="range" min="0.8" max="1.35" step="0.05" value="1.05" class="w-full accent-emerald-400" />
+            </div>
+            <div class="space-y-1.5">
+              <div class="flex justify-between text-xs">
+                <label for="settingSpeechPitch" class="text-white/70">โทนเสียง (ทุ้ม–แหลม)</label>
+                <span id="speechPitchVal" class="font-mono text-emerald-400">1.10</span>
+              </div>
+              <input id="settingSpeechPitch" type="range" min="0.8" max="1.5" step="0.05" value="1.10" class="w-full accent-emerald-400" />
+            </div>
           </div>
 
           <div class="space-y-1.5">
@@ -519,26 +538,60 @@
       let isListening = false;
       let voiceReplyEnabled = true;
       let speechRate = 1.05;
+      let speechPitch = 1.10;
+      let selectedVoiceName = '';
       try {
         if (localStorage.getItem('nadia_voice_reply') === 'off') voiceReplyEnabled = false;
         const savedRate = parseFloat(localStorage.getItem('nadia_speech_rate'));
         if (!isNaN(savedRate)) speechRate = savedRate;
+        const savedPitch = parseFloat(localStorage.getItem('nadia_speech_pitch'));
+        if (!isNaN(savedPitch)) speechPitch = savedPitch;
+        selectedVoiceName = localStorage.getItem('nadia_voice_name') || '';
       } catch (e) {}
 
       function cleanTextForSpeech(text) {
         return String(text || '').replace(/https?:\/\/\S+/g, '').replace(/[*`#_~>]/g, '').replace(/\s+/g, ' ').trim();
       }
 
-      function pickThaiFemaleVoice() {
-        if (!('speechSynthesis' in window)) return null;
-        const thai = (window.speechSynthesis.getVoices() || []).filter(function (v) {
+      function getThaiVoices() {
+        if (!('speechSynthesis' in window)) return [];
+        return (window.speechSynthesis.getVoices() || []).filter(function (v) {
           return v.lang && v.lang.toLowerCase().indexOf('th') === 0;
         });
+      }
+
+      function pickThaiFemaleVoice() {
+        const thai = getThaiVoices();
         if (!thai.length) return null;
-        return thai.find(function (v) {
+        if (selectedVoiceName) {
+          const exact = thai.find(function (v) { return v.name === selectedVoiceName; });
+          if (exact) return exact;
+        }
+        const femalePreferred = thai.find(function (v) {
           const n = (v.name || '').toLowerCase();
-          return n.indexOf('kanya') !== -1 || n.indexOf('premwadee') !== -1 || n.indexOf('achara') !== -1 || n.indexOf('female') !== -1 || n.indexOf('google') !== -1;
-        }) || thai[0];
+          return n.indexOf('premwadee') !== -1 || n.indexOf('kanya') !== -1 || n.indexOf('achara') !== -1 || n.indexOf('narisa') !== -1 || n.indexOf('female') !== -1;
+        });
+        if (femalePreferred) return femalePreferred;
+        const nonMale = thai.find(function (v) {
+          const n = (v.name || '').toLowerCase();
+          return n.indexOf('pattara') === -1 && n.indexOf('niwat') === -1 && n.indexOf('male') === -1;
+        });
+        return nonMale || thai[0];
+      }
+
+      function populateVoiceSelect() {
+        const sel = document.getElementById('settingVoiceSelect');
+        if (!sel) return;
+        const thai = getThaiVoices();
+        const best = pickThaiFemaleVoice();
+        sel.innerHTML = '<option value="">เลือกเสียงผู้หญิงภาษาไทยอัตโนมัติ' + (best ? ' (' + best.name + ')' : '') + '</option>';
+        thai.forEach(function (v) {
+          const opt = document.createElement('option');
+          opt.value = v.name;
+          opt.textContent = v.name + ' (' + v.lang + ')';
+          if (selectedVoiceName === v.name) opt.selected = true;
+          sel.appendChild(opt);
+        });
       }
 
       function stopSpeaking() {
@@ -556,7 +609,7 @@
         const utter = new SpeechSynthesisUtterance(spoken);
         utter.lang = 'th-TH';
         utter.rate = speechRate;
-        utter.pitch = 1.05;
+        utter.pitch = speechPitch;
         const v = pickThaiFemaleVoice();
         if (v) utter.voice = v;
         utter.onstart = function () { setOrbMode('speaking'); };
@@ -566,7 +619,7 @@
       }
 
       if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) {
-        window.speechSynthesis.onvoiceschanged = pickThaiFemaleVoice;
+        window.speechSynthesis.onvoiceschanged = populateVoiceSelect;
       }
 
       // ======================================================================
@@ -648,8 +701,12 @@
         settingModel: document.getElementById('settingModel'),
         settingMemoryWindow: document.getElementById('settingMemoryWindow'),
         memoryWindowVal: document.getElementById('memoryWindowVal'),
+        settingVoiceSelect: document.getElementById('settingVoiceSelect'),
+        testVoiceBtn: document.getElementById('testVoiceBtn'),
         settingSpeechRate: document.getElementById('settingSpeechRate'),
         speechRateVal: document.getElementById('speechRateVal'),
+        settingSpeechPitch: document.getElementById('settingSpeechPitch'),
+        speechPitchVal: document.getElementById('speechPitchVal'),
         settingSystemPrompt: document.getElementById('settingSystemPrompt'),
         ledgerModal: document.getElementById('ledgerModal'),
         taskModal: document.getElementById('taskModal'),
@@ -775,8 +832,11 @@
         el.settingModel.value = appState.model;
         el.settingMemoryWindow.value = appState.memoryWindow;
         el.memoryWindowVal.textContent = appState.memoryWindow + ' รอบ';
+        populateVoiceSelect();
         el.settingSpeechRate.value = speechRate;
         el.speechRateVal.textContent = speechRate.toFixed(2) + 'x';
+        el.settingSpeechPitch.value = speechPitch;
+        el.speechPitchVal.textContent = speechPitch.toFixed(2);
         el.settingSystemPrompt.value = appState.systemPrompt;
       }
 
@@ -964,6 +1024,7 @@
         try { localStorage.setItem('nadia_voice_reply', voiceReplyEnabled ? 'on' : 'off'); } catch (e) {}
         if (!voiceReplyEnabled) stopSpeaking();
         updateVoiceReplyToggleUI();
+      populateVoiceSelect();
         showToast(voiceReplyEnabled ? 'เปิดเสียงตอบกลับแล้วค่ะ' : 'ปิดเสียงตอบกลับแล้วค่ะ');
       });
       el.micBtn.addEventListener('click', toggleMicListening);
@@ -1050,10 +1111,23 @@
       el.settingMemoryWindow.addEventListener('input', function () {
         el.memoryWindowVal.textContent = el.settingMemoryWindow.value + ' รอบ';
       });
+      el.settingVoiceSelect.addEventListener('change', function () {
+        selectedVoiceName = el.settingVoiceSelect.value;
+        try { localStorage.setItem('nadia_voice_name', selectedVoiceName); } catch (e) {}
+        showToast('เปลี่ยนเสียงพูดแล้วค่ะ');
+      });
+      el.testVoiceBtn.addEventListener('click', function () {
+        speakText('สวัสดีค่ะแกรนด์ นาเดียพร้อมช่วยงานแล้วนะคะ');
+      });
       el.settingSpeechRate.addEventListener('input', function () {
         speechRate = parseFloat(el.settingSpeechRate.value);
         el.speechRateVal.textContent = speechRate.toFixed(2) + 'x';
         try { localStorage.setItem('nadia_speech_rate', String(speechRate)); } catch (e) {}
+      });
+      el.settingSpeechPitch.addEventListener('input', function () {
+        speechPitch = parseFloat(el.settingSpeechPitch.value);
+        el.speechPitchVal.textContent = speechPitch.toFixed(2);
+        try { localStorage.setItem('nadia_speech_pitch', String(speechPitch)); } catch (e) {}
       });
 
       el.settingsForm.addEventListener('submit', async function (e) {
