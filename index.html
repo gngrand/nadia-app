@@ -904,6 +904,8 @@
       let speechUnlocked = false;
       let speakSessionId = 0;
       let speakWatchdogTimer = null;
+      let speakKeepAliveTimer = null;
+      let micRetryCount = 0;
 
       function unlockSpeechSynthesis() {
         if (speechUnlocked || !('speechSynthesis' in window)) return;
@@ -939,6 +941,7 @@
         stopBargeInMonitor();
         if (speakDelayTimer) { clearTimeout(speakDelayTimer); speakDelayTimer = null; }
         if (speakWatchdogTimer) { clearTimeout(speakWatchdogTimer); speakWatchdogTimer = null; }
+        if (speakKeepAliveTimer) { clearInterval(speakKeepAliveTimer); speakKeepAliveTimer = null; }
         activeUtterance = null;
         if ('speechSynthesis' in window) {
           try { window.speechSynthesis.cancel(); } catch (e) {}
@@ -976,6 +979,7 @@
         function finishAll() {
           if (mySession !== speakSessionId) return;
           if (speakWatchdogTimer) { clearTimeout(speakWatchdogTimer); speakWatchdogTimer = null; }
+          if (speakKeepAliveTimer) { clearInterval(speakKeepAliveTimer); speakKeepAliveTimer = null; }
           stopBargeInMonitor();
           activeUtterance = null;
           if (orbState.mode === 'speaking') setOrbMode('idle');
@@ -1012,6 +1016,18 @@
             started = true;
             orbState.speakPulse = 0.85;
             setOrbMode('speaking');
+            if (!speakKeepAliveTimer) {
+              speakKeepAliveTimer = setInterval(function () {
+                if (mySession !== speakSessionId) {
+                  clearInterval(speakKeepAliveTimer);
+                  speakKeepAliveTimer = null;
+                  return;
+                }
+                try {
+                  if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+                } catch (e) {}
+              }, 3500);
+            }
             if (chunkIndex === 0 && voiceConversationActive && voiceBargeInEnabled) {
               startBargeInMonitor();
             }
@@ -1489,6 +1505,7 @@
         rec.continuous = false;
         rec.onstart = function () {
           if (recognition !== rec) return;
+          micRetryCount = 0;
           isListening = true;
           orbState.listenPulse = 0.55;
           el.micBtn.classList.add('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
@@ -1519,24 +1536,24 @@
             commitVoiceTranscript();
             return;
           }
-          // Only reset silence timer when words actually change (prevents background-noise confidence updates from stalling auto-send!)
+          // Reset silence timer only when words change (850ms lets you pause briefly mid-sentence without cutting off)
           if (textChanged || !silenceSendTimer) {
             if (silenceSendTimer) clearTimeout(silenceSendTimer);
-            silenceSendTimer = setTimeout(commitVoiceTranscript, 600);
+            silenceSendTimer = setTimeout(commitVoiceTranscript, 850);
           }
         };
         rec.onspeechend = function () {
           if (recognition !== rec || voiceSentForTurn) return;
           if ((latestVoiceTranscript || el.input.value || '').trim()) {
             if (silenceSendTimer) clearTimeout(silenceSendTimer);
-            silenceSendTimer = setTimeout(commitVoiceTranscript, 180);
+            silenceSendTimer = setTimeout(commitVoiceTranscript, 220);
           }
         };
         rec.onsoundend = function () {
           if (recognition !== rec || voiceSentForTurn) return;
           if ((latestVoiceTranscript || el.input.value || '').trim()) {
             if (silenceSendTimer) clearTimeout(silenceSendTimer);
-            silenceSendTimer = setTimeout(commitVoiceTranscript, 160);
+            silenceSendTimer = setTimeout(commitVoiceTranscript, 200);
           }
         };
         rec.onerror = function (ev) {
@@ -1546,16 +1563,26 @@
           el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
           // If we already captured spoken words before an error, still auto-send them!
           if (!voiceSentForTurn && (latestVoiceTranscript || el.input.value || '').trim() && !appState.busy) {
+            micRetryCount = 0;
             commitVoiceTranscript();
             return;
           }
           if (!appState.busy) setOrbMode('idle');
           const code = ev && ev.error ? ev.error : 'blocked';
           if (code === 'aborted') return;
+          // Auto-recover from transient mic lock (e.g. right after Barge-In release)
+          if (code === 'audio-capture' && voiceConversationActive && micRetryCount < 2) {
+            micRetryCount++;
+            setTimeout(function () {
+              if (voiceConversationActive && !appState.busy && !isListening) startMicListening(true);
+            }, 360);
+            return;
+          }
+          micRetryCount = 0;
           voiceConversationActive = false;
           updateChatLayout(false);
           if (code === 'no-speech') {
-            showToast('ไม่ได้ยินเสียงพูดค่ะ กดไมค์เมื่อต้องการคุยต่อนะคะ');
+            if (!isAutoResume) showToast('ไม่ได้ยินเสียงพูดค่ะ แตะก้อนอนุภาคหรือปุ่มไมค์เพื่อคุยต่อนะคะ');
           } else {
             showToast('ไม่สามารถใช้ไมโครโฟนได้ (' + code + ') กรุณาอนุญาตสิทธิ์ไมค์ในเบราว์เซอร์นะคะ');
           }
@@ -1586,7 +1613,7 @@
         showToast('รับฟังต่อค่ะ พูดได้เลยนะคะ');
         setTimeout(function () {
           if (voiceConversationActive && !appState.busy) startMicListening(true);
-        }, 150);
+        }, 280);
       }
 
       function toggleMicListening() {
