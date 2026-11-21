@@ -682,12 +682,30 @@
         orbState.rafId = requestAnimationFrame(renderOrb);
       }
 
+      let orbDownX = 0, orbDownY = 0;
       canvas.addEventListener('pointerdown', function (e) {
         orbState.isDragging = true;
+        orbDownX = e.clientX;
+        orbDownY = e.clientY;
         orbState.lastDragX = e.clientX;
         orbState.lastDragY = e.clientY;
       });
-      window.addEventListener('pointerup', function () { orbState.isDragging = false; });
+      window.addEventListener('pointerup', function (e) {
+        if (orbState.isDragging) {
+          orbState.isDragging = false;
+          const moved = Math.hypot(e.clientX - orbDownX, e.clientY - orbDownY);
+          if (moved < 6 && e.target === canvas) {
+            // Tapping the 3D orb interrupts Nadia if speaking, or starts listening
+            if (isNadiaSpeaking()) {
+              interruptAndListen();
+            } else if (!isListening && !appState.busy) {
+              voiceConversationActive = true;
+              updateChatLayout(true);
+              startMicListening(false);
+            }
+          }
+        }
+      });
       window.addEventListener('pointermove', function (e) {
         if (orbState.isDragging) {
           orbState.rotY += (e.clientX - orbState.lastDragX) * 0.008;
@@ -1385,9 +1403,29 @@
         try { rec.start(); } catch (e) { isListening = false; voiceConversationActive = false; updateChatLayout(false); }
       }
 
+      function isNadiaSpeaking() {
+        return orbState.mode === 'speaking' || Boolean(activeUtterance) || ('speechSynthesis' in window && window.speechSynthesis.speaking);
+      }
+
+      function interruptAndListen() {
+        clearVoiceTimers();
+        stopSpeaking();
+        voiceConversationActive = true;
+        updateChatLayout(false);
+        showToast('รับฟังต่อค่ะ พูดได้เลยนะคะ');
+        setTimeout(function () {
+          if (voiceConversationActive && !appState.busy) startMicListening(true);
+        }, 90);
+      }
+
       function toggleMicListening() {
         if (!SpeechRecognition) {
           showToast('เบราว์เซอร์นี้ยังไม่รองรับ Web Speech API ค่ะ แนะนำเปิดบน Chrome หรือ Edge ค่ะ');
+          return;
+        }
+        // Instant Barge-In: if Nadia is currently speaking, tapping Mic immediately interrupts her and listens!
+        if (isNadiaSpeaking()) {
+          interruptAndListen();
           return;
         }
         if (isListening || voiceConversationActive) {
@@ -1395,8 +1433,12 @@
           clearVoiceTimers();
           stopSpeaking();
           if (recognition && isListening) {
-            try { recognition.stop(); } catch (e) {}
+            const oldRec = recognition;
+            recognition = null;
+            detachRecognition(oldRec);
+            try { oldRec.abort(); } catch (e) { try { oldRec.stop(); } catch (e2) {} }
           }
+          isListening = false;
           el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
           if (!appState.busy) setOrbMode('idle');
           updateChatLayout(false);
@@ -1540,8 +1582,18 @@
       }
       el.sendBtn.addEventListener('click', function () { sendMessage(); });
       el.input.addEventListener('input', function () {
+        if (isNadiaSpeaking() && el.input.value.trim()) stopSpeaking();
         el.input.style.height = 'auto';
         el.input.style.height = Math.min(el.input.scrollHeight, 112) + 'px';
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+          if (tag !== 'input' && tag !== 'textarea' && tag !== 'select' && isNadiaSpeaking()) {
+            e.preventDefault();
+            interruptAndListen();
+          }
+        }
       });
       el.input.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
