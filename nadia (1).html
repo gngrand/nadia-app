@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Nadia" />
+  <title>Nadia</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100dvh;
+      background: #000000;
+      color: #f8fafc;
+      font-family: 'Inter', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+    .chat-scroll::-webkit-scrollbar { width: 4px; }
+    .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(52, 211, 153, 0.22); border-radius: 999px; }
+    .glass-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .glass-pill:focus-within {
+      border-color: rgba(52, 211, 153, 0.50);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+    }
+    .orb-stage {
+      transition: height 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
+    }
+    .orb-stage.compact { height: 165px; }
+    .orb-stage.hero { height: 50vh; min-height: 250px; max-height: 410px; }
+    .msg-content code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.86em;
+      background: rgba(16, 185, 129, 0.14);
+      color: #6ee7b7;
+      padding: 0.12em 0.4em;
+      border-radius: 0.35rem;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-up { animation: fadeUp 0.26s ease-out forwards; }
+    @keyframes micPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55); }
+      50% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }
+    }
+    .mic-listening { animation: micPulse 1.2s infinite ease-in-out; }
+    .nav-btn.active {
+      color: #6ee7b7;
+      background: rgba(16, 185, 129, 0.16);
+      box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.25);
+    }
+  </style>
+</head>
+<body class="bg-black text-slate-100 select-none">
+  <div class="relative flex flex-col h-[100dvh] w-full bg-black overflow-hidden">
+
+    <!-- Top App Header (Borderless Soft Pills) -->
+    <header class="relative z-20 flex items-center justify-between px-5 sm:px-7 pt-4 pb-2 shrink-0">
+      <div class="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.07]">
+        <span id="statusDot" class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)] transition-all duration-300"></span>
+        <span id="agentTitle" class="text-xs sm:text-sm font-medium tracking-[0.18em] uppercase text-white/95">NADIA</span>
+        <span id="modelLabel" class="hidden sm:inline-block text-[11px] font-mono text-emerald-300/45 pl-1 border-l border-white/10">gemini-4-hydrogen</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="toggleVoiceReplyBtn" class="w-9 h-9 rounded-full flex items-center justify-center bg-white/[0.04] border border-white/[0.07] text-emerald-400 hover:bg-emerald-500/15 transition" title="เปิด/ปิดเสียงตอบกลับของ Nadia" aria-label="เสียงตอบกลับ">
+          <i id="voiceReplyIcon" data-lucide="volume-2" class="w-4 h-4"></i>
+        </button>
+        <button id="toggleToolsBtn" class="w-9 h-9 rounded-full flex items-center justify-center bg-white/[0.04] border border-white/[0.07] text-white/60 hover:text-emerald-300 hover:bg-emerald-500/15 transition" title="คำสั่งด่วน Workspace" aria-label="คำสั่งด่วน">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+        </button>
+        <button id="resetChatBtn" class="w-9 h-9 rounded-full flex items-center justify-center bg-white/[0.04] border border-white/[0.07] text-white/60 hover:text-emerald-300 hover:bg-emerald-500/15 transition" title="กลับสู่หน้าหลัก" aria-label="เริ่มใหม่">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Slide-down Minimal Quick Command Palette -->
+    <div id="toolsDrawer" class="hidden absolute top-16 right-5 sm:right-7 z-30 w-64 rounded-3xl border border-white/10 bg-neutral-950/95 backdrop-blur-2xl p-2.5 shadow-2xl shadow-black/90 space-y-1">
+      <button data-cmd="/summary" class="tool-cmd w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-xs text-white/80 hover:bg-emerald-500/10 transition">
+        <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-400"></i>
+        <div><div class="font-medium text-white">สรุปยอดและงานค้าง</div><div class="text-[11px] text-white/40">/summary</div></div>
+      </button>
+      <button data-cmd="/email" class="tool-cmd w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-xs text-white/80 hover:bg-emerald-500/10 transition">
+        <i data-lucide="mail" class="w-4 h-4 text-teal-400"></i>
+        <div><div class="font-medium text-white">สรุปอีเมลใหม่ 5 ฉบับ</div><div class="text-[11px] text-white/40">/email</div></div>
+      </button>
+      <button id="drawerAnalyzeBtn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-xs text-white/80 hover:bg-emerald-500/10 transition">
+        <i data-lucide="compass" class="w-4 h-4 text-lime-400"></i>
+        <div><div class="font-medium text-white">วิเคราะห์หลายมุมก่อนตัดสินใจ</div><div class="text-[11px] text-white/40">/analyze</div></div>
+      </button>
+      <button id="drawerMemoryBtn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-xs text-white/80 hover:bg-emerald-500/10 transition">
+        <i data-lucide="brain" class="w-4 h-4 text-emerald-300"></i>
+        <div><div class="font-medium text-white">บันทึกความจำถาวร</div><div class="text-[11px] text-white/40">Core_Memory (/remember)</div></div>
+      </button>
+      <button id="drawerLedgerBtn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-xs text-white/80 hover:bg-emerald-500/10 transition">
+        <i data-lucide="wallet" class="w-4 h-4 text-teal-300"></i>
+        <div><div class="font-medium text-white">บันทึกรายรับ-รายจ่าย</div><div class="text-[11px] text-white/40">Quick Ledger (/log)</div></div>
+      </button>
+      <button id="drawerTaskBtn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left text-xs text-white/80 hover:bg-emerald-500/10 transition">
+        <i data-lucide="check-square" class="w-4 h-4 text-emerald-300"></i>
+        <div><div class="font-medium text-white">เพิ่มงานลงคิว</div><div class="text-[11px] text-white/40">Tasks Queue (/task)</div></div>
+      </button>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- VIEW 1: CHAT & 3D PARTICLE ORB                                     -->
+    <!-- ================================================================== -->
+    <div id="viewChat" class="flex-1 flex flex-col min-h-0">
+      <section id="orbStage" class="orb-stage hero relative w-full flex flex-col items-center justify-center shrink-0">
+        <canvas id="orbCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+        <div id="orbCaption" class="pointer-events-none absolute bottom-1 text-center transition-all duration-300">
+          <p id="orbStatusText" class="text-xs sm:text-sm font-light tracking-wide text-emerald-100/60">พร้อมรับคำสั่งค่ะแกรนด์</p>
+        </div>
+      </section>
+
+      <main id="chatStream" class="flex-1 overflow-y-auto chat-scroll px-4 sm:px-6 pb-3 select-text">
+        <div id="messagesList" class="max-w-2xl mx-auto space-y-5 pt-2"></div>
+      </main>
+
+      <div class="px-4 sm:px-6 pb-3 pt-1 shrink-0 bg-gradient-to-t from-black via-black/95 to-transparent">
+        <div class="max-w-2xl mx-auto space-y-2.5">
+          <div id="quickChips" class="flex items-center justify-center flex-wrap gap-1.5 transition-opacity duration-300">
+            <button data-cmd="/summary" class="tool-cmd px-3.5 py-1.5 rounded-full text-xs text-white/60 hover:text-emerald-200 border border-white/[0.08] hover:border-emerald-400/45 bg-white/[0.03] hover:bg-emerald-500/10 transition">สรุปยอดและงาน</button>
+            <button data-cmd="/email" class="tool-cmd px-3.5 py-1.5 rounded-full text-xs text-white/60 hover:text-teal-200 border border-white/[0.08] hover:border-teal-400/45 bg-white/[0.03] hover:bg-teal-500/10 transition">สรุปอีเมลใหม่</button>
+            <button id="chipAnalyzeBtn" class="px-3.5 py-1.5 rounded-full text-xs text-white/60 hover:text-lime-200 border border-white/[0.08] hover:border-lime-400/45 bg-white/[0.03] hover:bg-lime-500/10 transition">วิเคราะห์หลายมุม</button>
+            <button id="chipLedgerBtn" class="px-3.5 py-1.5 rounded-full text-xs text-white/60 hover:text-emerald-200 border border-white/[0.08] hover:border-emerald-400/45 bg-white/[0.03] hover:bg-emerald-500/10 transition">จดรายรับ-รายจ่าย</button>
+            <button id="chipTaskBtn" class="px-3.5 py-1.5 rounded-full text-xs text-white/60 hover:text-emerald-200 border border-white/[0.08] hover:border-emerald-400/45 bg-white/[0.03] hover:bg-emerald-500/10 transition">เพิ่มงานใหม่</button>
+          </div>
+
+          <div class="glass-pill rounded-full px-3 py-1.5 flex items-end gap-1.5 transition">
+            <button id="plusActionBtn" class="w-9 h-9 rounded-full flex items-center justify-center text-white/50 hover:text-emerald-300 hover:bg-emerald-500/10 transition shrink-0" title="บันทึกรายการด่วน" aria-label="เพิ่มรายการ">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+            </button>
+            <textarea id="messageInput" rows="1" placeholder="พิมพ์หรือกดไมค์คุยกับ Nadia..." class="flex-1 bg-transparent text-sm sm:text-[15px] text-white placeholder:text-white/35 resize-none outline-none py-2 max-h-28 leading-relaxed"></textarea>
+            <button id="micBtn" class="w-9 h-9 rounded-full flex items-center justify-center text-white/60 hover:text-emerald-300 hover:bg-emerald-500/10 transition shrink-0" title="สั่งงานด้วยเสียงภาษาไทย" aria-label="สั่งงานด้วยเสียง">
+              <i id="micIcon" data-lucide="mic" class="w-4 h-4"></i>
+            </button>
+            <button id="sendBtn" class="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed text-black flex items-center justify-center transition shrink-0 shadow-lg shadow-emerald-500/25" aria-label="ส่งข้อความ">
+              <i data-lucide="arrow-up" class="w-4 h-4 stroke-[2.4]"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- VIEW 2: CORE MEMORY MANAGER                                        -->
+    <!-- ================================================================== -->
+    <section id="viewMemory" class="hidden flex-1 overflow-y-auto chat-scroll px-4 sm:px-6 py-5 select-text">
+      <div class="max-w-2xl mx-auto space-y-5">
+        <div>
+          <h2 class="text-base font-semibold text-white">ความจำถาวร (Core_Memory)</h2>
+          <p class="text-xs text-white/45">Nadia จะอ่านรายการที่เปิดใช้งาน (Active) ทุกครั้งก่อนตอบคำถาม</p>
+        </div>
+
+        <form id="addMemoryForm" class="rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5 space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <input id="memCategory" type="text" placeholder="หมวดหมู่ (เช่น Investing, Law)" class="px-3.5 py-2.5 rounded-2xl border border-white/10 bg-black/50 text-xs sm:text-sm text-white placeholder:text-white/30 outline-none focus:border-emerald-400/60" />
+            <input id="memFact" type="text" required placeholder="สิ่งที่อยากให้ Nadia จำไว้ถาวร..." class="sm:col-span-2 px-3.5 py-2.5 rounded-2xl border border-white/10 bg-black/50 text-xs sm:text-sm text-white placeholder:text-white/30 outline-none focus:border-emerald-400/60" />
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" class="px-5 py-2 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-400 text-black hover:brightness-110 transition">เพิ่มความจำถาวร</button>
+          </div>
+        </form>
+
+        <div id="memoryItemsList" class="space-y-2.5"></div>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- VIEW 3: SETTINGS & API CONNECTION                                  -->
+    <!-- ================================================================== -->
+    <section id="viewSettings" class="hidden flex-1 overflow-y-auto chat-scroll px-4 sm:px-6 py-5 select-text">
+      <div class="max-w-2xl mx-auto space-y-5">
+        <div>
+          <h2 class="text-base font-semibold text-white">ตั้งค่าระบบและการเชื่อมต่อ</h2>
+          <p class="text-xs text-white/45">เชื่อมหลังบ้าน Google Apps Script เพื่อใช้ไมโครโฟนเต็มรูปแบบบนเว็บส่วนตัว</p>
+        </div>
+
+        <!-- Backend API Connection Card -->
+        <form id="connectionForm" class="rounded-3xl border border-emerald-500/25 bg-emerald-500/[0.05] p-5 space-y-3.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-medium text-emerald-300 flex items-center gap-2">
+              <i data-lucide="link" class="w-4 h-4"></i> เชื่อมต่อหลังบ้าน Apps Script API
+            </h3>
+            <span id="connStatusBadge" class="text-[11px] px-2.5 py-0.5 rounded-full bg-white/10 text-white/60">โหมดพรีวิว</span>
+          </div>
+          <div class="space-y-1.5">
+            <label for="apiUrlInput" class="block text-xs text-white/65">Apps Script Web App URL</label>
+            <input id="apiUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-black/60 text-xs sm:text-sm text-white placeholder:text-white/30 outline-none focus:border-emerald-400/60" />
+          </div>
+          <div class="space-y-1.5">
+            <label for="apiPinInput" class="block text-xs text-white/65">Access PIN (ตรงกับ NADIA_ACCESS_PIN ใน Script Properties)</label>
+            <input id="apiPinInput" type="password" placeholder="ใส่รหัส PIN ส่วนตัวของแกรนด์" class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-black/60 text-xs sm:text-sm text-white placeholder:text-white/30 outline-none focus:border-emerald-400/60" />
+          </div>
+          <div class="flex justify-end gap-2 pt-1">
+            <button type="submit" class="px-5 py-2 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-400 text-black hover:brightness-110 transition">บันทึกและทดสอบการเชื่อมต่อ</button>
+          </div>
+        </form>
+
+        <!-- AI Model & Voice Settings -->
+        <form id="settingsForm" class="rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5 space-y-4">
+          <div class="space-y-1.5">
+            <label for="settingModel" class="block text-xs font-medium text-white/70">โมเดล Gemini API (Free Tier)</label>
+            <select id="settingModel" class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-neutral-950 text-sm text-white outline-none focus:border-emerald-400/60">
+              <option value="gemini-4-hydrogen">gemini-4-hydrogen (แนะนำ — ฉลาดและไว)</option>
+              <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (ประหยัดโควตา/ตอบเร็วสุด)</option>
+              <option value="gemini-3.8-flash">gemini-3.8-flash (งานวิเคราะห์เชิงลึก)</option>
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs">
+              <label for="settingMemoryWindow" class="text-white/70">จำนวนประวัติแชทที่จำต่อรอบ (MEMORY_WINDOW)</label>
+              <span id="memoryWindowVal" class="font-mono text-emerald-400">10 รอบ</span>
+            </div>
+            <input id="settingMemoryWindow" type="range" min="4" max="40" step="2" value="10" class="w-full accent-emerald-400" />
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs">
+              <label for="settingSpeechRate" class="text-white/70">ความเร็วเสียงพูดตอบกลับ (TTS)</label>
+              <span id="speechRateVal" class="font-mono text-emerald-400">1.05x</span>
+            </div>
+            <input id="settingSpeechRate" type="range" min="0.8" max="1.35" step="0.05" value="1.05" class="w-full accent-emerald-400" />
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="settingSystemPrompt" class="block text-xs font-medium text-white/70">System Prompt (บุคลิกและกติกาของ Nadia)</label>
+            <textarea id="settingSystemPrompt" rows="3" class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-black/60 text-xs sm:text-sm text-white outline-none focus:border-emerald-400/60 resize-none"></textarea>
+          </div>
+
+          <div class="flex justify-end">
+            <button type="submit" class="px-5 py-2 rounded-full text-xs font-semibold bg-white/10 hover:bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 transition">บันทึกการตั้งค่าลงชีต</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- FLOATING ROUNDED PILL NAVIGATION BAR                               -->
+    <!-- ================================================================== -->
+    <nav class="relative z-20 shrink-0 px-4 pt-1 pb-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-center">
+      <div class="inline-grid grid-cols-3 gap-1 p-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-2xl shadow-lg shadow-black/60">
+        <button data-tab="chat" class="nav-btn active flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs font-medium text-white/50 hover:text-emerald-200 transition">
+          <i data-lucide="message-circle" class="w-4 h-4"></i>
+          <span>แชท</span>
+        </button>
+        <button data-tab="memory" class="nav-btn flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs font-medium text-white/50 hover:text-emerald-200 transition">
+          <i data-lucide="brain" class="w-4 h-4"></i>
+          <span>ความจำ</span>
+        </button>
+        <button data-tab="settings" class="nav-btn flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs font-medium text-white/50 hover:text-emerald-200 transition">
+          <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+          <span>ตั้งค่า</span>
+        </button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Quick Ledger Modal -->
+  <div id="ledgerModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div class="w-full max-w-sm rounded-3xl border border-emerald-500/20 bg-neutral-950 p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-white flex items-center gap-2">
+          <i data-lucide="wallet" class="w-4 h-4 text-emerald-400"></i> บันทึกรายรับ-รายจ่าย
+        </h3>
+        <button data-close-modal="ledgerModal" class="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="ledgerForm" class="space-y-3">
+        <div class="grid grid-cols-2 gap-2">
+          <label class="cursor-pointer">
+            <input type="radio" name="ledgerType" value="รายจ่าย" checked class="peer sr-only" />
+            <div class="text-center py-2 rounded-2xl border border-white/10 peer-checked:border-rose-400/60 peer-checked:bg-rose-500/15 peer-checked:text-rose-300 text-xs font-medium text-white/60 transition">รายจ่าย</div>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="ledgerType" value="รายรับ" class="peer sr-only" />
+            <div class="text-center py-2 rounded-2xl border border-white/10 peer-checked:border-emerald-400/60 peer-checked:bg-emerald-500/15 peer-checked:text-emerald-300 text-xs font-medium text-white/60 transition">รายรับ</div>
+          </label>
+        </div>
+        <input id="ledgerCategory" type="text" required placeholder="หมวดหมู่ (เช่น อาหาร, เดินทาง)" class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-white/[0.04] text-sm text-white placeholder:text-white/30 outline-none focus:border-emerald-400/60" />
+        <input id="ledgerItem" type="text" required placeholder="รายการ (เช่น กาแฟเย็น)" class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-white/[0.04] text-sm text-white placeholder:text-white/30 outline-none focus:border-emerald-400/60" />
+        <input id="ledgerAmount" type="number" min="1" step="any" required placeholder="จำนวนเงิน (บาท)" class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-white/[0.04] text-sm text-white placeholder:text-white/30 outline-none focus:border-emerald-400/60" />
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" data-close-modal="ledgerModal" class="px-4 py-2 rounded-full text-xs text-white/55 hover:text-white">ยกเลิก</button>
+          <button type="submit" class="px-5 py-2 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-400 text-black hover:brightness-110">บันทึก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Quick Task Modal -->
+  <div id="taskModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div class="w-full max-w-sm rounded-3xl border border-emerald-500/20 bg-neutral-950 p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-white flex items-center gap-2">
+          <i data-lucide="check-square" class="w-4 h-4 text-emerald-400"></i> เพิ่มงานลง Tasks Queue
+        </h3>
+        <button data-close-modal="taskModal" class="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="taskForm" class="space-y-3">
+        <textarea id="taskTitle" rows="3" required placeholder="รายละเอียดงานที่ต้องการเพิ่ม..." class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-white/[0.04] text-sm text-white placeholder:text-white/30 outline-none focus:border-emerald-400/60 resize-none"></textarea>
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" data-close-modal="taskModal" class="px-4 py-2 rounded-full text-xs text-white/55 hover:text-white">ยกเลิก</button>
+          <button type="submit" class="px-5 py-2 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-400 text-black hover:brightness-110">เพิ่มงาน</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Minimal Toast -->
+  <div id="toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 backdrop-blur-md text-emerald-100 text-xs opacity-0 pointer-events-none transition-opacity duration-200"></div>
+
+  <script>
+    (function () {
+      // ======================================================================
+      // 1. 3D ANIMATED PARTICLE ORB ENGINE (Smooth Round Emerald Sphere)
+      // ======================================================================
+      const canvas = document.getElementById('orbCanvas');
+      const ctx = canvas.getContext('2d');
+
+      const orbState = {
+        mode: 'idle', energy: 0.0, targetEnergy: 0.0, thinkPhase: 0.0,
+        time: 0, rotY: 0, rotX: 0.22, targetMouseX: 0, targetMouseY: 0,
+        mouseX: 0, mouseY: 0, isDragging: false, lastDragX: 0, lastDragY: 0,
+        pulseRings: [], ringSpawnTimer: 0, rafId: null
+      };
+
+      const LAT_BANDS = 48;
+      const LON_STEPS = 80;
+      const points = [];
+      for (let i = 1; i < LAT_BANDS; i++) {
+        const theta = (i / LAT_BANDS) * Math.PI;
+        const sinT = Math.sin(theta), cosT = Math.cos(theta);
+        const ringCount = Math.max(10, Math.round(LON_STEPS * sinT));
+        for (let j = 0; j < ringCount; j++) {
+          const phi = (j / ringCount) * Math.PI * 2;
+          points.push({ theta: theta, phi: phi, nx: sinT * Math.cos(phi), ny: cosT, nz: sinT * Math.sin(phi) });
+        }
+      }
+
+      function resizeCanvas() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2) return;
+        canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+        canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function setOrbMode(mode) {
+        orbState.mode = mode;
+        if (mode === 'thinking') {
+          orbState.targetEnergy = 1.0;
+          el.statusDot.classList.add('scale-125', 'bg-lime-300');
+          el.orbCaption.classList.add('opacity-0');
+        } else if (mode === 'listening') {
+          orbState.targetEnergy = 0.82;
+          el.statusDot.classList.add('scale-125', 'bg-lime-300');
+          el.orbCaption.classList.add('opacity-0');
+        } else if (mode === 'speaking') {
+          orbState.targetEnergy = 0.62;
+          el.statusDot.classList.remove('scale-125', 'bg-lime-300');
+          if (appState.hasMessages) el.orbCaption.classList.add('opacity-0');
+        } else {
+          orbState.targetEnergy = 0.0;
+          el.statusDot.classList.remove('scale-125', 'bg-lime-300');
+          el.orbStatusText.textContent = 'พร้อมรับคำสั่งค่ะแกรนด์';
+          if (appState.hasMessages) el.orbCaption.classList.add('opacity-0');
+        }
+      }
+
+      function waveDisplacement(nx, ny, nz, t, amp, energy) {
+        const w1 = Math.sin(nx * 2.6 + t * 0.95) * Math.cos(ny * 2.3 - t * 0.72);
+        const w2 = Math.sin(nz * 2.9 - t * 0.85) * Math.sin((nx + ny) * 2.1 + t * 0.6);
+        const w3 = Math.cos((ny - nz) * 3.4 + t * 1.15) * 0.45;
+        const neural = energy > 0.02 ? Math.sin((nx * 5.2 + ny * 4.8 - nz * 4.4) + t * 3.8) * 0.14 * energy : 0;
+        const breathe = Math.sin(t * 2.8) * 0.055 * energy;
+        return 1 + breathe + (w1 * 0.095 + w2 * 0.075 + w3 * 0.045) * amp + neural;
+      }
+
+      function renderOrb() {
+        const rect = canvas.getBoundingClientRect();
+        const w = rect.width, h = rect.height;
+        if (w < 2 || h < 2) { orbState.rafId = requestAnimationFrame(renderOrb); return; }
+
+        orbState.energy += (orbState.targetEnergy - orbState.energy) * 0.08;
+        orbState.mouseX += (orbState.targetMouseX - orbState.mouseX) * 0.06;
+        orbState.mouseY += (orbState.targetMouseY - orbState.mouseY) * 0.06;
+
+        const e = orbState.energy;
+        orbState.time += 0.015 + e * 0.048;
+        orbState.thinkPhase += 0.05 + e * 0.12;
+        if (!orbState.isDragging) {
+          orbState.rotY += 0.0042 + e * 0.024;
+          orbState.rotX += Math.sin(orbState.time * 0.8) * 0.0018 * e;
+        }
+
+        const t = orbState.time, amp = 1.0 + e * 0.65;
+        const cx = w * 0.5, cy = h * 0.5;
+        const baseRadius = Math.min(w, h) * 0.35;
+        const fov = baseRadius * 3.4;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const halo = ctx.createRadialGradient(cx, cy, baseRadius * 0.08, cx, cy, baseRadius * (1.35 + e * 0.45));
+        halo.addColorStop(0, 'rgba(52, 211, 153, ' + (0.11 + e * 0.16).toFixed(3) + ')');
+        halo.addColorStop(0.5, 'rgba(16, 185, 129, ' + (0.05 + e * 0.09).toFixed(3) + ')');
+        halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = halo;
+        ctx.fillRect(0, 0, w, h);
+
+        if (orbState.mode === 'thinking' || orbState.mode === 'listening' || orbState.mode === 'speaking') {
+          orbState.ringSpawnTimer += 1;
+          if (orbState.ringSpawnTimer >= (orbState.mode === 'thinking' ? 20 : 28)) {
+            orbState.ringSpawnTimer = 0;
+            orbState.pulseRings.push({ radius: baseRadius * 0.82, alpha: 0.52 });
+          }
+        }
+        for (let rIdx = orbState.pulseRings.length - 1; rIdx >= 0; rIdx--) {
+          const ring = orbState.pulseRings[rIdx];
+          ring.radius += baseRadius * 0.018;
+          ring.alpha -= 0.013;
+          if (ring.alpha <= 0.01) orbState.pulseRings.splice(rIdx, 1);
+          else {
+            ctx.beginPath();
+            ctx.arc(cx, cy, ring.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(110, 231, 183, ' + ring.alpha.toFixed(3) + ')';
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+          }
+        }
+
+        const rx = orbState.rotX + orbState.mouseY * 0.35;
+        const ry = orbState.rotY + orbState.mouseX * 0.45;
+        const cosX = Math.cos(rx), sinX = Math.sin(rx);
+        const cosY = Math.cos(ry), sinY = Math.sin(ry);
+
+        const projected = new Array(points.length);
+        for (let i = 0; i < points.length; i++) {
+          const p = points[i];
+          const r = baseRadius * waveDisplacement(p.nx, p.ny, p.nz, t, amp, e);
+          const x0 = p.nx * r, y0 = p.ny * r, z0 = p.nz * r;
+          const x1 = x0 * cosY - z0 * sinY, z1 = x0 * sinY + z0 * cosY;
+          const y2 = y0 * cosX - z1 * sinX, z2 = y0 * sinX + z1 * cosX;
+          const scale = fov / (fov + z2 + baseRadius * 0.6);
+          projected[i] = { x: cx + x1 * scale, y: cy + y2 * scale, z: z2, depth: (z2 + baseRadius * 1.4) / (baseRadius * 2.8), ny: p.ny, nx: p.nx, rNorm: r / baseRadius };
+        }
+        projected.sort(function (a, b) { return b.z - a.z; });
+
+        for (let i = 0; i < projected.length; i++) {
+          const pt = projected[i];
+          const frontness = Math.max(0, Math.min(1, 1 - pt.depth));
+          const limeMix = Math.max(0, Math.min(1, (pt.ny * 0.52 + 0.46) + (1 - frontness) * 0.22 + Math.sin(t * 1.4 + pt.nx * 2.2) * (0.09 + e * 0.14)));
+          const thinkGlow = e * (0.5 + 0.5 * Math.sin(orbState.thinkPhase + pt.nx * 3.5 + pt.ny * 3.5));
+
+          const rCol = Math.min(255, Math.round(24 + limeMix * 135 + thinkGlow * 55));
+          const gCol = Math.min(255, Math.round(215 + limeMix * 32 + thinkGlow * 25));
+          const bCol = Math.max(70, Math.round(188 - limeMix * 96 + thinkGlow * 25));
+          const ridgeBoost = Math.max(0, (pt.rNorm - 0.92) * 1.5);
+          const alpha = Math.min(0.98, 0.15 + frontness * 0.72 + ridgeBoost * 0.22 + thinkGlow * 0.16);
+          const dotRadius = Math.max(0.75, (0.85 + frontness * 1.25 + ridgeBoost * 0.55 + thinkGlow * 0.38) * (baseRadius / 120));
+
+          ctx.fillStyle = 'rgba(' + rCol + ',' + gCol + ',' + bCol + ',' + alpha.toFixed(3) + ')';
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, dotRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        orbState.rafId = requestAnimationFrame(renderOrb);
+      }
+
+      canvas.addEventListener('pointerdown', function (e) {
+        orbState.isDragging = true;
+        orbState.lastDragX = e.clientX;
+        orbState.lastDragY = e.clientY;
+      });
+      window.addEventListener('pointerup', function () { orbState.isDragging = false; });
+      window.addEventListener('pointermove', function (e) {
+        if (orbState.isDragging) {
+          orbState.rotY += (e.clientX - orbState.lastDragX) * 0.008;
+          orbState.rotX += (e.clientY - orbState.lastDragY) * 0.008;
+          orbState.lastDragX = e.clientX;
+          orbState.lastDragY = e.clientY;
+        } else {
+          orbState.targetMouseX = (e.clientX / Math.max(1, window.innerWidth) - 0.5) * 1.2;
+          orbState.targetMouseY = (e.clientY / Math.max(1, window.innerHeight) - 0.5) * 1.2;
+        }
+      });
+      window.addEventListener('resize', resizeCanvas);
+
+      // ======================================================================
+      // 2. NATIVE MICROPHONE (STT) + VOICE REPLY (TTS) — 100% FREE
+      // ======================================================================
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let recognition = null;
+      let isListening = false;
+      let voiceReplyEnabled = true;
+      let speechRate = 1.05;
+      try {
+        if (localStorage.getItem('nadia_voice_reply') === 'off') voiceReplyEnabled = false;
+        const savedRate = parseFloat(localStorage.getItem('nadia_speech_rate'));
+        if (!isNaN(savedRate)) speechRate = savedRate;
+      } catch (e) {}
+
+      function cleanTextForSpeech(text) {
+        return String(text || '').replace(/https?:\/\/\S+/g, '').replace(/[*`#_~>]/g, '').replace(/\s+/g, ' ').trim();
+      }
+
+      function pickThaiFemaleVoice() {
+        if (!('speechSynthesis' in window)) return null;
+        const thai = (window.speechSynthesis.getVoices() || []).filter(function (v) {
+          return v.lang && v.lang.toLowerCase().indexOf('th') === 0;
+        });
+        if (!thai.length) return null;
+        return thai.find(function (v) {
+          const n = (v.name || '').toLowerCase();
+          return n.indexOf('kanya') !== -1 || n.indexOf('premwadee') !== -1 || n.indexOf('achara') !== -1 || n.indexOf('female') !== -1 || n.indexOf('google') !== -1;
+        }) || thai[0];
+      }
+
+      function stopSpeaking() {
+        if ('speechSynthesis' in window) {
+          try { window.speechSynthesis.cancel(); } catch (e) {}
+        }
+        if (orbState.mode === 'speaking') setOrbMode('idle');
+      }
+
+      function speakText(rawText) {
+        if (!('speechSynthesis' in window)) return;
+        stopSpeaking();
+        const spoken = cleanTextForSpeech(rawText);
+        if (!spoken) return;
+        const utter = new SpeechSynthesisUtterance(spoken);
+        utter.lang = 'th-TH';
+        utter.rate = speechRate;
+        utter.pitch = 1.05;
+        const v = pickThaiFemaleVoice();
+        if (v) utter.voice = v;
+        utter.onstart = function () { setOrbMode('speaking'); };
+        utter.onend = function () { if (orbState.mode === 'speaking') setOrbMode('idle'); };
+        utter.onerror = function () { if (orbState.mode === 'speaking') setOrbMode('idle'); };
+        window.speechSynthesis.speak(utter);
+      }
+
+      if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = pickThaiFemaleVoice;
+      }
+
+      // ======================================================================
+      // 3. STANDALONE API BRIDGE (CORS-Safe text/plain POST to Apps Script)
+      // ======================================================================
+      const appState = {
+        activeTab: 'chat',
+        busy: false,
+        hasMessages: false,
+        apiUrl: '',
+        apiPin: '',
+        connected: false,
+        model: 'gemini-4-hydrogen',
+        memoryWindow: 10,
+        systemPrompt: 'คุณคือ Nadia ผู้ช่วยผู้หญิงด้านการพัฒนาระบบ AI และจัดการงานส่วนตัวของแกรนด์ ตอบเป็นภาษาไทยอย่างสุภาพโดยใช้คำลงท้าย ค่ะ และ คะ แทน ครับ กระชับ มีโครงสร้าง ชัดเจน และลงมือทำได้จริง',
+        previewLedger: [],
+        previewTasks: [
+          { task: 'นำไฟล์ index.html ขึ้น GitHub Pages หรือ Cloudflare Pages', status: 'Open' }
+        ],
+        previewMemories: [
+          { rowIndex: 2, category: 'Persona', fact: 'Nadia เป็นผู้ช่วยผู้หญิงของแกรนด์ ใช้คำลงท้าย ค่ะ และ คะ แทน ครับ', active: true },
+          { rowIndex: 3, category: 'Style', fact: 'แกรนด์ชอบคำตอบที่เป็นเหตุเป็นผล มีโครงสร้าง กระชับ ชัดเจน และลงมือทำได้จริง', active: true },
+          { rowIndex: 4, category: 'Focus', fact: 'หัวข้อหลักที่แกรนด์สนใจ: พัฒนาระบบ AI, การจัดการการเงิน/พอร์ตลงทุน และงานกฎหมาย-บัญชี', active: true }
+        ]
+      };
+
+      try {
+        appState.apiUrl = localStorage.getItem('nadia_api_url') || '';
+        appState.apiPin = localStorage.getItem('nadia_api_pin') || '';
+      } catch (e) {}
+
+      function isLiveApiConfigured() {
+        return Boolean(appState.apiUrl && appState.apiUrl.indexOf('https://') === 0 && appState.apiPin);
+      }
+
+      async function callBackendApi(action, payload) {
+        const body = Object.assign({ action: action, pin: appState.apiPin }, payload || {});
+        const response = await fetch(appState.apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(body)
+        });
+        const text = await response.text();
+        try {
+          return JSON.parse(text);
+        } catch (err) {
+          throw new Error('ไม่สามารถอ่านคำตอบจาก Apps Script ได้ กรุณาตรวจสอบว่า Deploy ตั้งค่า Who has access เป็น Anyone ค่ะ');
+        }
+      }
+
+      const el = {
+        viewChat: document.getElementById('viewChat'),
+        viewMemory: document.getElementById('viewMemory'),
+        viewSettings: document.getElementById('viewSettings'),
+        orbStage: document.getElementById('orbStage'),
+        orbCaption: document.getElementById('orbCaption'),
+        orbStatusText: document.getElementById('orbStatusText'),
+        quickChips: document.getElementById('quickChips'),
+        chatStream: document.getElementById('chatStream'),
+        messagesList: document.getElementById('messagesList'),
+        input: document.getElementById('messageInput'),
+        sendBtn: document.getElementById('sendBtn'),
+        micBtn: document.getElementById('micBtn'),
+        toggleVoiceReplyBtn: document.getElementById('toggleVoiceReplyBtn'),
+        voiceReplyIcon: document.getElementById('voiceReplyIcon'),
+        toolsDrawer: document.getElementById('toolsDrawer'),
+        toggleToolsBtn: document.getElementById('toggleToolsBtn'),
+        resetChatBtn: document.getElementById('resetChatBtn'),
+        agentTitle: document.getElementById('agentTitle'),
+        modelLabel: document.getElementById('modelLabel'),
+        statusDot: document.getElementById('statusDot'),
+        memoryItemsList: document.getElementById('memoryItemsList'),
+        addMemoryForm: document.getElementById('addMemoryForm'),
+        connectionForm: document.getElementById('connectionForm'),
+        apiUrlInput: document.getElementById('apiUrlInput'),
+        apiPinInput: document.getElementById('apiPinInput'),
+        connStatusBadge: document.getElementById('connStatusBadge'),
+        settingsForm: document.getElementById('settingsForm'),
+        settingModel: document.getElementById('settingModel'),
+        settingMemoryWindow: document.getElementById('settingMemoryWindow'),
+        memoryWindowVal: document.getElementById('memoryWindowVal'),
+        settingSpeechRate: document.getElementById('settingSpeechRate'),
+        speechRateVal: document.getElementById('speechRateVal'),
+        settingSystemPrompt: document.getElementById('settingSystemPrompt'),
+        ledgerModal: document.getElementById('ledgerModal'),
+        taskModal: document.getElementById('taskModal'),
+        ledgerForm: document.getElementById('ledgerForm'),
+        taskForm: document.getElementById('taskForm'),
+        toast: document.getElementById('toast')
+      };
+
+      function showToast(msg) {
+        el.toast.textContent = msg;
+        el.toast.classList.remove('opacity-0');
+        el.toast.classList.add('opacity-100');
+        setTimeout(function () {
+          el.toast.classList.remove('opacity-100');
+          el.toast.classList.add('opacity-0');
+        }, 2200);
+      }
+
+      function escapeHtml(str) {
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function formatMessageHtml(raw) {
+        let html = escapeHtml(raw);
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-medium text-white">$1</strong>');
+        return html.replace(/\n/g, '<br>');
+      }
+
+      function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { showToast('คัดลอกข้อความแล้วค่ะ'); }).catch(function () { fallbackCopy(text); });
+        } else { fallbackCopy(text); }
+      }
+
+      function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); showToast('คัดลอกข้อความแล้วค่ะ'); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+
+      function updateConnBadge(connected) {
+        appState.connected = connected;
+        if (connected) {
+          el.connStatusBadge.textContent = 'เชื่อมต่อแล้ว';
+          el.connStatusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300';
+        } else {
+          el.connStatusBadge.textContent = 'โหมดพรีวิว';
+          el.connStatusBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-white/10 text-white/60';
+        }
+      }
+
+      function switchTab(tabName) {
+        appState.activeTab = tabName;
+        el.toolsDrawer.classList.add('hidden');
+        const map = { chat: el.viewChat, memory: el.viewMemory, settings: el.viewSettings };
+        Object.keys(map).forEach(function (k) { map[k].classList.toggle('hidden', k !== tabName); });
+        document.querySelectorAll('.nav-btn').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+        });
+        if (tabName === 'chat') setTimeout(resizeCanvas, 60);
+        if (tabName === 'memory') loadMemoryView();
+        if (tabName === 'settings') syncSettingsUI();
+      }
+
+      // ---- Core Memory View ----
+      function renderMemoryList(items) {
+        if (!items || !items.length) {
+          el.memoryItemsList.innerHTML = '<p class="text-xs text-white/40 py-2">ยังไม่มีรายการความจำถาวรค่ะ</p>';
+          return;
+        }
+        el.memoryItemsList.innerHTML = items.map(function (m) {
+          return (
+            '<div class="flex items-start justify-between gap-3 p-4 rounded-3xl border border-white/[0.08] bg-white/[0.025]">' +
+              '<div class="min-w-0 space-y-1">' +
+                '<span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-300">' + escapeHtml(m.category) + '</span>' +
+                '<p class="text-xs sm:text-sm ' + (m.active ? 'text-white/90' : 'text-white/35 line-through') + '">' + escapeHtml(m.fact) + '</p>' +
+              '</div>' +
+              '<label class="inline-flex items-center cursor-pointer shrink-0 mt-1">' +
+                '<input type="checkbox" data-mem-row="' + m.rowIndex + '" ' + (m.active ? 'checked' : '') + ' class="mem-toggle accent-emerald-400 w-4 h-4" />' +
+              '</label>' +
+            '</div>'
+          );
+        }).join('');
+
+        el.memoryItemsList.querySelectorAll('.mem-toggle').forEach(function (cb) {
+          cb.addEventListener('change', async function () {
+            const rowIdx = Number(cb.getAttribute('data-mem-row'));
+            const active = cb.checked;
+            if (isLiveApiConfigured()) {
+              try {
+                const res = await callBackendApi('memory_toggle', { rowIndex: rowIdx, active: active });
+                if (res && res.ok) {
+                  showToast(active ? 'เปิดใช้งานความจำแล้วค่ะ' : 'ปิดใช้งานความจำชั่วคราวแล้วค่ะ');
+                  loadMemoryView();
+                } else { showToast(res.error || 'อัปเดตไม่สำเร็จค่ะ'); }
+              } catch (err) { showToast(err.message); }
+            } else {
+              const found = appState.previewMemories.find(function (x) { return x.rowIndex === rowIdx; });
+              if (found) found.active = active;
+              showToast(active ? 'เปิดใช้งานความจำแล้วค่ะ' : 'ปิดใช้งานความจำชั่วคราวแล้วค่ะ');
+              loadMemoryView();
+            }
+          });
+        });
+      }
+
+      async function loadMemoryView() {
+        if (isLiveApiConfigured()) {
+          try {
+            const res = await callBackendApi('memory_list');
+            if (res && res.ok) { renderMemoryList(res.items); return; }
+          } catch (err) { showToast(err.message); }
+        }
+        renderMemoryList(appState.previewMemories.slice().reverse());
+      }
+
+      function syncSettingsUI() {
+        el.apiUrlInput.value = appState.apiUrl;
+        el.apiPinInput.value = appState.apiPin;
+        el.settingModel.value = appState.model;
+        el.settingMemoryWindow.value = appState.memoryWindow;
+        el.memoryWindowVal.textContent = appState.memoryWindow + ' รอบ';
+        el.settingSpeechRate.value = speechRate;
+        el.speechRateVal.textContent = speechRate.toFixed(2) + 'x';
+        el.settingSystemPrompt.value = appState.systemPrompt;
+      }
+
+      function setChatActive(active) {
+        appState.hasMessages = active;
+        if (active) {
+          el.orbStage.classList.remove('hero'); el.orbStage.classList.add('compact');
+          el.quickChips.classList.add('hidden');
+        } else {
+          el.orbStage.classList.remove('compact'); el.orbStage.classList.add('hero');
+          el.orbCaption.classList.remove('opacity-0'); el.quickChips.classList.remove('hidden');
+        }
+        setTimeout(resizeCanvas, 320);
+        setTimeout(resizeCanvas, 580);
+      }
+
+      function appendMessage(role, text) {
+        if (!appState.hasMessages) setChatActive(true);
+        const row = document.createElement('div');
+        row.className = 'animate-fade-up ' + (role === 'user' ? 'flex justify-end' : 'flex justify-start');
+
+        if (role === 'user') {
+          row.innerHTML = '<div class="max-w-[82%] rounded-3xl rounded-br-md bg-emerald-500/15 border border-emerald-400/20 px-4 py-2.5 text-sm sm:text-[15px] text-white leading-relaxed msg-content">' + formatMessageHtml(text) + '</div>';
+        } else if (role === 'error') {
+          row.className = 'animate-fade-up flex justify-center';
+          row.innerHTML = '<div class="max-w-lg rounded-2xl border border-rose-500/35 bg-rose-500/10 text-rose-300 px-4 py-2 text-xs">' + escapeHtml(text) + '</div>';
+        } else {
+          row.innerHTML =
+            '<div class="max-w-[92%] space-y-2">' +
+              '<div class="text-sm sm:text-[15px] text-slate-200/95 leading-relaxed msg-content">' + formatMessageHtml(text) + '</div>' +
+              '<div class="flex items-center gap-3">' +
+                '<button class="speak-btn inline-flex items-center gap-1 text-[11px] text-white/35 hover:text-emerald-300 transition"><i data-lucide="volume-2" class="w-3 h-3"></i> ฟังเสียง</button>' +
+                '<button class="copy-btn inline-flex items-center gap-1 text-[11px] text-white/35 hover:text-emerald-300 transition"><i data-lucide="copy" class="w-3 h-3"></i> คัดลอก</button>' +
+              '</div>' +
+            '</div>';
+          row.querySelector('.copy-btn').addEventListener('click', function () { copyText(text); });
+          row.querySelector('.speak-btn').addEventListener('click', function () { speakText(text); });
+        }
+
+        el.messagesList.appendChild(row);
+        if (window.lucide) lucide.createIcons();
+        el.chatStream.scrollTo({ top: el.chatStream.scrollHeight, behavior: 'smooth' });
+        return row;
+      }
+
+      function simulatePreviewReply(text) {
+        if (text === '/summary') return '**โหมดพรีวิวค่ะ:** ไปที่แท็บ **ตั้งค่า** แล้ววาง Apps Script Web App URL + Access PIN เพื่อเชื่อมข้อมูลจริงจาก Google Sheets, Gmail และ Calendar ได้เลยนะคะ';
+        if (text.indexOf('/analyze ') === 0) {
+          return '**วิเคราะห์หลายมุม:** ' + text.replace('/analyze ', '').trim() + '\n1. **โอกาส:** เพิ่มความคล่องตัวและใช้งานเสียงได้จริง\n2. **ความเสี่ยง:** ตรวจสอบสิทธิ์การเข้าถึงด้วย Access PIN เสมอ\n3. **ต้นทุน:** ฟรี 0 บาทบน GitHub Pages / Cloudflare Pages\n4. **ก้าวแรก:** อัปโหลดไฟล์นี้เป็น `index.html` แล้วกรอก URL + PIN ในแท็บตั้งค่าค่ะ';
+        }
+        return 'สวัสดีค่ะแกรนด์ ตอนนี้หน้าเว็บพร้อมใช้งานไมโครโฟนเต็มรูปแบบแล้วค่ะ เมื่อนำไฟล์นี้ไปวางบน **GitHub Pages** หรือ **Cloudflare Pages** แล้วใส่ Apps Script URL + Access PIN ในแท็บ **ตั้งค่า** ก็คุยด้วยเสียงกับระบบจริงของแกรนด์ได้ทันทีเลยนะคะ';
+      }
+
+      async function sendMessage(overrideText) {
+        const text = String(overrideText !== undefined ? overrideText : el.input.value).trim();
+        if (!text || appState.busy) return;
+        if (appState.activeTab !== 'chat') switchTab('chat');
+
+        stopSpeaking();
+        el.input.value = '';
+        el.input.style.height = 'auto';
+        el.toolsDrawer.classList.add('hidden');
+        appState.busy = true;
+        el.sendBtn.disabled = true;
+
+        appendMessage('user', text);
+        setOrbMode('thinking');
+
+        if (isLiveApiConfigured()) {
+          try {
+            const res = await callBackendApi('chat', { text: text });
+            if (res && res.ok) {
+              appendMessage('bot', res.reply);
+              if (voiceReplyEnabled) speakText(res.reply);
+              else { setOrbMode('speaking'); setTimeout(function () { setOrbMode('idle'); }, 1100); }
+            } else {
+              setOrbMode('idle');
+              appendMessage('error', (res && res.error) ? res.error : 'เชื่อมต่อไม่สำเร็จค่ะ');
+            }
+          } catch (err) {
+            setOrbMode('idle');
+            appendMessage('error', 'เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + (err.message || err));
+          }
+          appState.busy = false;
+          el.sendBtn.disabled = false;
+          el.input.focus();
+        } else {
+          setTimeout(function () {
+            const reply = simulatePreviewReply(text);
+            appendMessage('bot', reply);
+            if (voiceReplyEnabled) speakText(reply);
+            else { setOrbMode('speaking'); setTimeout(function () { setOrbMode('idle'); }, 1100); }
+            appState.busy = false;
+            el.sendBtn.disabled = false;
+            el.input.focus();
+          }, 900);
+        }
+      }
+
+      function updateVoiceReplyToggleUI() {
+        el.toggleVoiceReplyBtn.classList.toggle('text-emerald-400', voiceReplyEnabled);
+        el.toggleVoiceReplyBtn.classList.toggle('text-white/40', !voiceReplyEnabled);
+        el.voiceReplyIcon.setAttribute('data-lucide', voiceReplyEnabled ? 'volume-2' : 'volume-x');
+        if (window.lucide) lucide.createIcons();
+      }
+
+      function toggleMicListening() {
+        if (!SpeechRecognition) {
+          showToast('เบราว์เซอร์นี้ยังไม่รองรับ Web Speech API ค่ะ แนะนำเปิดบน Chrome ค่ะ');
+          return;
+        }
+        if (isListening && recognition) { recognition.stop(); return; }
+        stopSpeaking();
+        recognition = new SpeechRecognition();
+        recognition.lang = 'th-TH';
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        recognition.onstart = function () {
+          isListening = true;
+          el.micBtn.classList.add('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
+          setOrbMode('listening');
+          showToast('กำลังฟังอยู่ค่ะ พูดได้เลยนะคะ');
+        };
+        recognition.onresult = function (event) {
+          let transcript = '', isFinal = false;
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+            if (event.results[i].isFinal) isFinal = true;
+          }
+          el.input.value = transcript;
+          if (isFinal && transcript.trim()) sendMessage(transcript.trim());
+        };
+        recognition.onerror = function (ev) {
+          isListening = false;
+          el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
+          if (!appState.busy) setOrbMode('idle');
+          showToast('ไม่สามารถใช้ไมโครโฟนได้ (' + (ev.error || 'blocked') + ') กรุณาอนุญาตสิทธิ์ไมค์ในเบราว์เซอร์นะคะ');
+        };
+        recognition.onend = function () {
+          isListening = false;
+          el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
+          if (!appState.busy) setOrbMode('idle');
+        };
+        try { recognition.start(); } catch (e) { isListening = false; }
+      }
+
+      async function initLiveSession() {
+        if (!isLiveApiConfigured()) { updateConnBadge(false); return; }
+        try {
+          const data = await callBackendApi('init');
+          if (data && data.ok) {
+            updateConnBadge(true);
+            appState.model = data.model || 'gemini-4-hydrogen';
+            appState.memoryWindow = data.memoryWindow || 10;
+            appState.systemPrompt = data.systemPrompt || appState.systemPrompt;
+            el.agentTitle.textContent = (data.agentName || 'NADIA').toUpperCase();
+            el.modelLabel.textContent = appState.model;
+            el.messagesList.innerHTML = '';
+            if (data.history && data.history.length) {
+              data.history.forEach(function (turn) {
+                if (turn.user) appendMessage('user', turn.user);
+                if (turn.model) appendMessage('bot', turn.model);
+              });
+            }
+          } else {
+            updateConnBadge(false);
+            showToast((data && data.error) ? data.error : 'เชื่อมต่อไม่สำเร็จค่ะ');
+          }
+        } catch (err) {
+          updateConnBadge(false);
+          showToast(err.message || 'เชื่อมต่อไม่สำเร็จค่ะ');
+        }
+      }
+
+      function openModal(modal) { el.toolsDrawer.classList.add('hidden'); modal.classList.remove('hidden'); modal.classList.add('flex'); }
+      function closeModal(modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+      function prefillCommand(prefix) { switchTab('chat'); el.input.value = prefix; el.input.focus(); }
+
+      // Wire Controls
+      document.querySelectorAll('.nav-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { switchTab(btn.getAttribute('data-tab')); });
+      });
+      el.toggleVoiceReplyBtn.addEventListener('click', function () {
+        voiceReplyEnabled = !voiceReplyEnabled;
+        try { localStorage.setItem('nadia_voice_reply', voiceReplyEnabled ? 'on' : 'off'); } catch (e) {}
+        if (!voiceReplyEnabled) stopSpeaking();
+        updateVoiceReplyToggleUI();
+        showToast(voiceReplyEnabled ? 'เปิดเสียงตอบกลับแล้วค่ะ' : 'ปิดเสียงตอบกลับแล้วค่ะ');
+      });
+      el.micBtn.addEventListener('click', toggleMicListening);
+      el.toggleToolsBtn.addEventListener('click', function () { el.toolsDrawer.classList.toggle('hidden'); });
+      el.resetChatBtn.addEventListener('click', function () {
+        stopSpeaking(); switchTab('chat'); el.messagesList.innerHTML = ''; setChatActive(false); setOrbMode('idle');
+      });
+      el.sendBtn.addEventListener('click', function () { sendMessage(); });
+      el.input.addEventListener('input', function () {
+        el.input.style.height = 'auto';
+        el.input.style.height = Math.min(el.input.scrollHeight, 112) + 'px';
+      });
+      el.input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+      });
+
+      document.querySelectorAll('.tool-cmd').forEach(function (btn) {
+        btn.addEventListener('click', function () { sendMessage(btn.getAttribute('data-cmd')); });
+      });
+      document.getElementById('drawerAnalyzeBtn').addEventListener('click', function () { prefillCommand('/analyze '); });
+      document.getElementById('chipAnalyzeBtn').addEventListener('click', function () { prefillCommand('/analyze '); });
+      document.getElementById('drawerMemoryBtn').addEventListener('click', function () { switchTab('memory'); });
+      document.getElementById('drawerLedgerBtn').addEventListener('click', function () { openModal(el.ledgerModal); });
+      document.getElementById('chipLedgerBtn').addEventListener('click', function () { openModal(el.ledgerModal); });
+      document.getElementById('plusActionBtn').addEventListener('click', function () { openModal(el.ledgerModal); });
+      document.getElementById('drawerTaskBtn').addEventListener('click', function () { openModal(el.taskModal); });
+      document.getElementById('chipTaskBtn').addEventListener('click', function () { openModal(el.taskModal); });
+      document.querySelectorAll('[data-close-modal]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const modal = document.getElementById(btn.getAttribute('data-close-modal'));
+          if (modal) closeModal(modal);
+        });
+      });
+
+      el.ledgerForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const type = el.ledgerForm.querySelector('input[name="ledgerType"]:checked').value;
+        const cat = document.getElementById('ledgerCategory').value.trim();
+        const item = document.getElementById('ledgerItem').value.trim();
+        const amt = document.getElementById('ledgerAmount').value.trim();
+        if (!cat || !item || !amt) return;
+        closeModal(el.ledgerModal); el.ledgerForm.reset();
+        sendMessage('/log ' + cat + ' ' + item + ' ' + amt + ' บาท ' + type);
+      });
+
+      el.taskForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const title = document.getElementById('taskTitle').value.trim();
+        if (!title) return;
+        closeModal(el.taskModal); el.taskForm.reset();
+        sendMessage('/task ' + title);
+      });
+
+      el.addMemoryForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const cat = document.getElementById('memCategory').value.trim() || 'General';
+        const fact = document.getElementById('memFact').value.trim();
+        if (!fact) return;
+        if (isLiveApiConfigured()) {
+          try {
+            const res = await callBackendApi('memory_add', { category: cat, fact: fact });
+            if (res && res.ok) { el.addMemoryForm.reset(); showToast('บันทึกความจำถาวรแล้วค่ะ'); loadMemoryView(); }
+            else { showToast(res.error || 'บันทึกไม่สำเร็จค่ะ'); }
+          } catch (err) { showToast(err.message); }
+        } else {
+          appState.previewMemories.push({ rowIndex: appState.previewMemories.length + 2, category: cat, fact: fact, active: true });
+          el.addMemoryForm.reset(); showToast('บันทึกความจำถาวรแล้วค่ะ (โหมดพรีวิว)'); loadMemoryView();
+        }
+      });
+
+      el.connectionForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        appState.apiUrl = el.apiUrlInput.value.trim();
+        appState.apiPin = el.apiPinInput.value.trim();
+        try {
+          localStorage.setItem('nadia_api_url', appState.apiUrl);
+          localStorage.setItem('nadia_api_pin', appState.apiPin);
+        } catch (err) {}
+        showToast('กำลังทดสอบการเชื่อมต่อค่ะ...');
+        await initLiveSession();
+        if (appState.connected) showToast('เชื่อมต่อกับ Nadia สำเร็จแล้วค่ะ!');
+      });
+
+      el.settingMemoryWindow.addEventListener('input', function () {
+        el.memoryWindowVal.textContent = el.settingMemoryWindow.value + ' รอบ';
+      });
+      el.settingSpeechRate.addEventListener('input', function () {
+        speechRate = parseFloat(el.settingSpeechRate.value);
+        el.speechRateVal.textContent = speechRate.toFixed(2) + 'x';
+        try { localStorage.setItem('nadia_speech_rate', String(speechRate)); } catch (e) {}
+      });
+
+      el.settingsForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        appState.model = el.settingModel.value;
+        appState.memoryWindow = Number(el.settingMemoryWindow.value);
+        appState.systemPrompt = el.settingSystemPrompt.value.trim();
+        el.modelLabel.textContent = appState.model;
+        if (isLiveApiConfigured()) {
+          try {
+            const res = await callBackendApi('settings_update', {
+              settings: { model: appState.model, memoryWindow: appState.memoryWindow, systemPrompt: appState.systemPrompt }
+            });
+            showToast(res && res.ok ? 'บันทึกการตั้งค่าลงชีต Config แล้วค่ะ' : (res.error || 'บันทึกไม่สำเร็จค่ะ'));
+          } catch (err) { showToast(err.message); }
+        } else {
+          showToast('บันทึกการตั้งค่าแล้วค่ะ (โหมดพรีวิว)');
+        }
+      });
+
+      updateVoiceReplyToggleUI();
+      if (window.lucide) lucide.createIcons();
+      window.addEventListener('load', function () {
+        resizeCanvas();
+        if (orbState.rafId) cancelAnimationFrame(orbState.rafId);
+        renderOrb();
+      });
+      resizeCanvas();
+      renderOrb();
+      initLiveSession();
+    })();
+  </script>
+</body>
+</html>
