@@ -40,13 +40,25 @@
       box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
     }
     .orb-stage {
-      transition: height 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
+      transition: height 0.52s cubic-bezier(0.22, 1, 0.36, 1), min-height 0.52s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
     }
-    .orb-stage.compact { height: 215px; }
-    .orb-stage.hero { height: 55vh; min-height: 300px; max-height: 480px; }
-    .chat-fade-mask {
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.92) 14%, #000 22%, #000 100%);
-      mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.92) 14%, #000 22%, #000 100%);
+    .orb-stage.compact {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      height: 205px;
+      min-height: 205px;
+      background: linear-gradient(to bottom, #000000 78%, rgba(0, 0, 0, 0) 100%);
+    }
+    .orb-stage.hero {
+      position: relative;
+      height: 100%;
+      min-height: 100%;
+    }
+    .orb-stage.voice-focus {
+      position: relative;
+      height: 100%;
+      min-height: 100%;
     }
     .msg-content code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -129,15 +141,18 @@
     <!-- VIEW 1: CHAT & 3D PARTICLE ORB                                     -->
     <!-- ================================================================== -->
     <div id="viewChat" class="flex-1 flex flex-col min-h-0">
-      <section id="orbStage" class="orb-stage hero relative w-full flex flex-col items-center justify-center shrink-0">
-        <canvas id="orbCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
-        <div id="orbCaption" class="pointer-events-none absolute bottom-1 text-center transition-all duration-300">
-          <p id="orbStatusText" class="text-xs sm:text-sm font-light tracking-wide text-emerald-100/60">พร้อมรับคำสั่งค่ะแกรนด์</p>
-        </div>
-      </section>
+      <main id="chatStream" class="flex-1 overflow-y-auto chat-scroll select-text relative">
+        <section id="orbStage" class="orb-stage hero relative w-full flex flex-col items-center justify-center shrink-0">
+          <canvas id="orbCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+          <button id="scrollToChatBtn" type="button" class="hidden absolute bottom-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] text-white/45 hover:text-emerald-300 hover:border-emerald-400/30 transition" title="เลื่อนลงเพื่อดูข้อความ">
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+            <span>เลื่อนลงดูข้อความ</span>
+          </button>
+        </section>
 
-      <main id="chatStream" class="chat-fade-mask flex-1 overflow-y-auto chat-scroll px-4 sm:px-6 pb-4 pt-4 select-text">
-        <div id="messagesList" class="max-w-2xl mx-auto space-y-5 pt-2"></div>
+        <div id="messagesWrap" class="px-4 sm:px-6 pb-8 pt-2">
+          <div id="messagesList" class="max-w-2xl mx-auto space-y-5"></div>
+        </div>
       </main>
 
       <div class="px-4 sm:px-6 pb-3 pt-1 shrink-0 bg-gradient-to-t from-black via-black/95 to-transparent">
@@ -267,6 +282,14 @@
             </div>
           </div>
 
+          <div class="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border border-white/10 bg-black/40">
+            <div class="space-y-0.5">
+              <label for="settingHandsFree" class="block text-xs font-medium text-white/85">โหมดคุยโต้ตอบต่อเนื่องอัตโนมัติ (Hands-Free)</label>
+              <p class="text-[11px] text-white/45">พูดจบแล้วส่งทันทีโดยไม่ต้องกดส่ง และเปิดไมค์ฟังต่อหลัง Nadia พูดจบ</p>
+            </div>
+            <input id="settingHandsFree" type="checkbox" checked class="accent-emerald-400 w-4 h-4 shrink-0 cursor-pointer" />
+          </div>
+
           <div class="space-y-1.5">
             <label for="settingSystemPrompt" class="block text-xs font-medium text-white/70">System Prompt (บุคลิกและกติกาของ Nadia)</label>
             <textarea id="settingSystemPrompt" rows="3" class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-black/60 text-xs sm:text-sm text-white outline-none focus:border-emerald-400/60 resize-none"></textarea>
@@ -367,6 +390,7 @@
 
       const orbState = {
         mode: 'idle', energy: 0.0, targetEnergy: 0.0, thinkPhase: 0.0,
+        voiceAmp: 0.0, speakPulse: 0.0,
         time: 0, rotY: 0, rotX: 0.22, targetMouseX: 0, targetMouseY: 0,
         mouseX: 0, mouseY: 0, isDragging: false, lastDragX: 0, lastDragY: 0,
         pulseRings: [], ringSpawnTimer: 0, rafId: null
@@ -397,35 +421,34 @@
       function setOrbMode(mode) {
         orbState.mode = mode;
         if (mode === 'thinking') {
-          orbState.targetEnergy = 1.0;
+          orbState.targetEnergy = 0.95;
           el.statusDot.classList.add('scale-125', 'bg-lime-300');
-          el.orbCaption.classList.add('opacity-0');
         } else if (mode === 'listening') {
-          orbState.targetEnergy = 0.82;
+          orbState.targetEnergy = 0.78;
           el.statusDot.classList.add('scale-125', 'bg-lime-300');
-          el.orbCaption.classList.add('opacity-0');
         } else if (mode === 'speaking') {
-          orbState.targetEnergy = 0.62;
+          orbState.targetEnergy = 0.68;
           el.statusDot.classList.remove('scale-125', 'bg-lime-300');
-          if (appState.hasMessages) el.orbCaption.classList.add('opacity-0');
         } else {
           orbState.targetEnergy = 0.0;
           el.statusDot.classList.remove('scale-125', 'bg-lime-300');
-          el.orbStatusText.textContent = 'พร้อมรับคำสั่งค่ะแกรนด์';
-          if (appState.hasMessages) el.orbCaption.classList.add('opacity-0');
         }
       }
 
-      function waveDisplacement(nx, ny, nz, t, amp, energy) {
-        // Multi-layered slow organic liquid folds + gentle natural idle breathing
+      function waveDisplacement(nx, ny, nz, t, amp, energy, voiceAmp) {
+        // Multi-layered slow organic liquid folds + live voice-reactive ripples
         const idleBreath = Math.sin(t * 0.65) * 0.028;
         const w1 = Math.sin(nx * 2.1 + t * 0.62) * Math.cos(ny * 1.9 - t * 0.48);
         const w2 = Math.sin(nz * 2.4 - t * 0.55) * Math.sin((nx - ny) * 1.8 + t * 0.42);
         const w3 = Math.cos((ny + nz) * 2.9 + t * 0.78) * 0.52;
         const drift = Math.sin((nx * nz) * 3.2 + t * 0.85) * 0.35;
-        const neural = energy > 0.02 ? Math.sin((nx * 4.8 + ny * 4.4 - nz * 4.2) + t * 3.4) * 0.13 * energy : 0;
-        const activeBreath = Math.sin(t * 2.6) * 0.05 * energy;
-        return 1 + idleBreath + activeBreath + (w1 * 0.115 + w2 * 0.09 + w3 * 0.05 + drift * 0.04) * amp + neural;
+        const neural = energy > 0.02 ? Math.sin((nx * 4.8 + ny * 4.4 - nz * 4.2) + t * 3.4) * 0.12 * energy : 0;
+        const vocalRipple = voiceAmp > 0.01
+          ? (Math.sin((nx * 5.6 + ny * 4.8 - nz * 5.1) + t * 6.2) * 0.15 + Math.cos((ny * 6.4 - nz * 4.5) - t * 4.8) * 0.09) * voiceAmp
+          : 0;
+        const vocalExpand = voiceAmp * 0.14;
+        const activeBreath = Math.sin(t * 2.6) * 0.045 * energy;
+        return 1 + idleBreath + activeBreath + vocalExpand + (w1 * 0.115 + w2 * 0.09 + w3 * 0.05 + drift * 0.04) * amp + neural + vocalRipple;
       }
 
       function renderOrb() {
@@ -437,34 +460,51 @@
         orbState.mouseX += (orbState.targetMouseX - orbState.mouseX) * 0.06;
         orbState.mouseY += (orbState.targetMouseY - orbState.mouseY) * 0.06;
 
-        const e = orbState.energy;
-        orbState.time += 0.012 + e * 0.042;
-        orbState.thinkPhase += 0.05 + e * 0.12;
-        if (!orbState.isDragging) {
-          orbState.rotY += 0.0032 + e * 0.021;
-          orbState.rotX = 0.22 + Math.sin(orbState.time * 0.38) * 0.14;
-          orbState.rotX += Math.sin(orbState.time * 0.8) * 0.0018 * e;
+        // Live voice reactivity (real microphone RMS when listening, syllable-cadence envelope when speaking)
+        if (orbState.mode === 'listening') {
+          const liveLevel = readMicVolumeLevel();
+          const targetV = liveLevel >= 0 ? liveLevel : (0.18 + 0.16 * Math.abs(Math.sin(orbState.time * 3.6)));
+          orbState.voiceAmp += (targetV - orbState.voiceAmp) * 0.28;
+        } else if (orbState.mode === 'speaking') {
+          orbState.speakPulse *= 0.88;
+          const cadence = 0.24 + 0.36 * Math.abs(Math.sin(orbState.time * 4.8)) * (0.62 + 0.38 * Math.sin(orbState.time * 10.6));
+          const targetS = Math.min(1.0, cadence + orbState.speakPulse * 0.62);
+          orbState.voiceAmp += (targetS - orbState.voiceAmp) * 0.24;
+        } else {
+          orbState.speakPulse *= 0.85;
+          orbState.voiceAmp *= 0.90;
         }
 
-        const t = orbState.time, amp = 1.0 + e * 0.65;
+        const e = orbState.energy;
+        const va = orbState.voiceAmp;
+        orbState.time += 0.012 + e * 0.036 + va * 0.045;
+        orbState.thinkPhase += 0.05 + e * 0.11 + va * 0.16;
+        if (!orbState.isDragging) {
+          orbState.rotY += 0.0032 + e * 0.016 + va * 0.022;
+          orbState.rotX = 0.22 + Math.sin(orbState.time * 0.38) * 0.14;
+          orbState.rotX += Math.sin(orbState.time * 0.8) * 0.0018 * (e + va);
+        }
+
+        const t = orbState.time, amp = 1.0 + e * 0.55 + va * 0.85;
         const cx = w * 0.5, cy = h * 0.5;
         const baseRadius = Math.min(w, h) * 0.41;
         const fov = baseRadius * 3.4;
 
         ctx.clearRect(0, 0, w, h);
 
-        const halo = ctx.createRadialGradient(cx, cy, baseRadius * 0.08, cx, cy, baseRadius * (1.35 + e * 0.45));
-        halo.addColorStop(0, 'rgba(52, 211, 153, ' + (0.11 + e * 0.16).toFixed(3) + ')');
-        halo.addColorStop(0.5, 'rgba(16, 185, 129, ' + (0.05 + e * 0.09).toFixed(3) + ')');
+        const halo = ctx.createRadialGradient(cx, cy, baseRadius * 0.08, cx, cy, baseRadius * (1.35 + e * 0.38 + va * 0.45));
+        halo.addColorStop(0, 'rgba(52, 211, 153, ' + Math.min(0.45, 0.11 + e * 0.14 + va * 0.22).toFixed(3) + ')');
+        halo.addColorStop(0.5, 'rgba(16, 185, 129, ' + Math.min(0.28, 0.05 + e * 0.08 + va * 0.12).toFixed(3) + ')');
         halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = halo;
         ctx.fillRect(0, 0, w, h);
 
         if (orbState.mode === 'thinking' || orbState.mode === 'listening' || orbState.mode === 'speaking') {
-          orbState.ringSpawnTimer += 1;
-          if (orbState.ringSpawnTimer >= (orbState.mode === 'thinking' ? 20 : 28)) {
+          orbState.ringSpawnTimer += 1 + va * 1.4;
+          const ringThreshold = orbState.mode === 'thinking' ? 20 : (va > 0.22 ? 16 : 30);
+          if (orbState.ringSpawnTimer >= ringThreshold) {
             orbState.ringSpawnTimer = 0;
-            orbState.pulseRings.push({ radius: baseRadius * 0.82, alpha: 0.52 });
+            orbState.pulseRings.push({ radius: baseRadius * (0.82 + va * 0.12), alpha: Math.min(0.75, 0.42 + va * 0.32) });
           }
         }
         for (let rIdx = orbState.pulseRings.length - 1; rIdx >= 0; rIdx--) {
@@ -489,7 +529,7 @@
         const projected = new Array(points.length);
         for (let i = 0; i < points.length; i++) {
           const p = points[i];
-          const r = baseRadius * waveDisplacement(p.nx, p.ny, p.nz, t, amp, e);
+          const r = baseRadius * waveDisplacement(p.nx, p.ny, p.nz, t, amp, e, va);
           const x0 = p.nx * r, y0 = p.ny * r, z0 = p.nz * r;
           const x1 = x0 * cosY - z0 * sinY, z1 = x0 * sinY + z0 * cosY;
           const y2 = y0 * cosX - z1 * sinX, z2 = y0 * sinX + z1 * cosX;
@@ -508,8 +548,8 @@
           const gCol = Math.min(255, Math.round(215 + limeMix * 32 + thinkGlow * 25));
           const bCol = Math.max(70, Math.round(188 - limeMix * 96 + thinkGlow * 25));
           const ridgeBoost = Math.max(0, (pt.rNorm - 0.92) * 1.5);
-          const alpha = Math.min(0.98, 0.15 + frontness * 0.72 + ridgeBoost * 0.22 + thinkGlow * 0.16);
-          const dotRadius = Math.max(0.75, (0.85 + frontness * 1.25 + ridgeBoost * 0.55 + thinkGlow * 0.38) * (baseRadius / 120));
+          const alpha = Math.min(0.99, 0.15 + frontness * 0.70 + ridgeBoost * 0.24 + thinkGlow * 0.14 + va * 0.22);
+          const dotRadius = Math.max(0.75, (0.85 + frontness * 1.22 + ridgeBoost * 0.55 + thinkGlow * 0.32 + va * 0.52) * (baseRadius / 120));
 
           ctx.fillStyle = 'rgba(' + rCol + ',' + gCol + ',' + bCol + ',' + alpha.toFixed(3) + ')';
           ctx.beginPath();
@@ -545,17 +585,80 @@
       let recognition = null;
       let isListening = false;
       let voiceReplyEnabled = true;
+      let handsFreeEnabled = true;
+      let voiceConversationActive = false;
+      let latestVoiceTranscript = '';
+      let voiceSentForTurn = false;
+      let silenceSendTimer = null;
+      let resumeListenTimer = null;
       let speechRate = 1.05;
       let speechPitch = 1.10;
       let selectedVoiceName = '';
       try {
         if (localStorage.getItem('nadia_voice_reply') === 'off') voiceReplyEnabled = false;
+        if (localStorage.getItem('nadia_hands_free') === 'off') handsFreeEnabled = false;
         const savedRate = parseFloat(localStorage.getItem('nadia_speech_rate'));
         if (!isNaN(savedRate)) speechRate = savedRate;
         const savedPitch = parseFloat(localStorage.getItem('nadia_speech_pitch'));
         if (!isNaN(savedPitch)) speechPitch = savedPitch;
         selectedVoiceName = localStorage.getItem('nadia_voice_name') || '';
       } catch (e) {}
+
+      let micAudioCtx = null;
+      let micMediaStream = null;
+      let micAnalyser = null;
+      let micDataArray = null;
+
+      function startMicAudioMeter() {
+        if (micAnalyser) return;
+        if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return;
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+          if (!isListening && !voiceConversationActive) {
+            stream.getTracks().forEach(function (tr) { tr.stop(); });
+            return;
+          }
+          micMediaStream = stream;
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+          micAudioCtx = new AudioCtx();
+          const source = micAudioCtx.createMediaStreamSource(stream);
+          micAnalyser = micAudioCtx.createAnalyser();
+          micAnalyser.fftSize = 256;
+          micAnalyser.smoothingTimeConstant = 0.72;
+          source.connect(micAnalyser);
+          micDataArray = new Uint8Array(micAnalyser.fftSize);
+        }).catch(function () {});
+      }
+
+      function stopMicAudioMeter() {
+        if (micMediaStream) {
+          try { micMediaStream.getTracks().forEach(function (tr) { tr.stop(); }); } catch (e) {}
+          micMediaStream = null;
+        }
+        if (micAudioCtx) {
+          try { micAudioCtx.close(); } catch (e) {}
+          micAudioCtx = null;
+        }
+        micAnalyser = null;
+        micDataArray = null;
+      }
+
+      function readMicVolumeLevel() {
+        if (!micAnalyser || !micDataArray) return -1;
+        micAnalyser.getByteTimeDomainData(micDataArray);
+        let sumSq = 0;
+        for (let i = 0; i < micDataArray.length; i++) {
+          const norm = (micDataArray[i] - 128) / 128;
+          sumSq += norm * norm;
+        }
+        const rms = Math.sqrt(sumSq / micDataArray.length);
+        return Math.min(1.0, Math.max(0.0, (rms - 0.012) * 7.2));
+      }
+
+      function clearVoiceTimers() {
+        if (silenceSendTimer) { clearTimeout(silenceSendTimer); silenceSendTimer = null; }
+        if (resumeListenTimer) { clearTimeout(resumeListenTimer); resumeListenTimer = null; }
+      }
 
       function cleanTextForSpeech(text) {
         return String(text || '').replace(/https?:\/\/\S+/g, '').replace(/[*`#_~>]/g, '').replace(/\s+/g, ' ').trim();
@@ -634,20 +737,45 @@
         if (orbState.mode === 'speaking') setOrbMode('idle');
       }
 
-      function speakText(rawText) {
-        if (!('speechSynthesis' in window)) return;
+      function scheduleResumeListening() {
+        if (!voiceConversationActive || !handsFreeEnabled || appState.busy || appState.activeTab !== 'chat') return;
+        if (resumeListenTimer) clearTimeout(resumeListenTimer);
+        resumeListenTimer = setTimeout(function () {
+          resumeListenTimer = null;
+          if (voiceConversationActive && handsFreeEnabled && !appState.busy && !isListening && appState.activeTab === 'chat') {
+            startMicListening(true);
+          }
+        }, 480);
+      }
+
+      function speakText(rawText, options) {
+        const shouldResume = Boolean(options && options.resumeAfter);
+        if (!('speechSynthesis' in window)) {
+          if (shouldResume) scheduleResumeListening();
+          return;
+        }
         stopSpeaking();
         const spoken = cleanTextForSpeech(rawText);
-        if (!spoken) return;
+        if (!spoken) {
+          if (shouldResume) scheduleResumeListening();
+          return;
+        }
         const utter = new SpeechSynthesisUtterance(spoken);
         const v = pickPreferredVoice();
         utter.lang = (v && v.lang) ? v.lang : 'th-TH';
         utter.rate = speechRate;
         utter.pitch = speechPitch;
         if (v) utter.voice = v;
-        utter.onstart = function () { setOrbMode('speaking'); };
-        utter.onend = function () { if (orbState.mode === 'speaking') setOrbMode('idle'); };
-        utter.onerror = function () { if (orbState.mode === 'speaking') setOrbMode('idle'); };
+        utter.onstart = function () { orbState.speakPulse = 0.85; setOrbMode('speaking'); };
+        utter.onboundary = function () { orbState.speakPulse = Math.min(1.0, orbState.speakPulse + 0.72); };
+        utter.onend = function () {
+          if (orbState.mode === 'speaking') setOrbMode('idle');
+          if (shouldResume) scheduleResumeListening();
+        };
+        utter.onerror = function () {
+          if (orbState.mode === 'speaking') setOrbMode('idle');
+          if (shouldResume) scheduleResumeListening();
+        };
         window.speechSynthesis.speak(utter);
       }
 
@@ -708,8 +836,7 @@
         viewMemory: document.getElementById('viewMemory'),
         viewSettings: document.getElementById('viewSettings'),
         orbStage: document.getElementById('orbStage'),
-        orbCaption: document.getElementById('orbCaption'),
-        orbStatusText: document.getElementById('orbStatusText'),
+        scrollToChatBtn: document.getElementById('scrollToChatBtn'),
         quickChips: document.getElementById('quickChips'),
         chatStream: document.getElementById('chatStream'),
         messagesList: document.getElementById('messagesList'),
@@ -740,6 +867,7 @@
         speechRateVal: document.getElementById('speechRateVal'),
         settingSpeechPitch: document.getElementById('settingSpeechPitch'),
         speechPitchVal: document.getElementById('speechPitchVal'),
+        settingHandsFree: document.getElementById('settingHandsFree'),
         settingSystemPrompt: document.getElementById('settingSystemPrompt'),
         ledgerModal: document.getElementById('ledgerModal'),
         taskModal: document.getElementById('taskModal'),
@@ -870,20 +998,38 @@
         el.speechRateVal.textContent = speechRate.toFixed(2) + 'x';
         el.settingSpeechPitch.value = speechPitch;
         el.speechPitchVal.textContent = speechPitch.toFixed(2);
+        if (el.settingHandsFree) el.settingHandsFree.checked = handsFreeEnabled;
         el.settingSystemPrompt.value = appState.systemPrompt;
+      }
+
+      function updateChatLayout(scrollTopOnVoice) {
+        if (voiceConversationActive) {
+          el.orbStage.classList.remove('hero', 'compact');
+          el.orbStage.classList.add('voice-focus');
+          el.quickChips.classList.add('hidden');
+          if (el.scrollToChatBtn) el.scrollToChatBtn.classList.toggle('hidden', !appState.hasMessages);
+          if (scrollTopOnVoice) {
+            el.chatStream.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        } else if (appState.hasMessages) {
+          el.orbStage.classList.remove('hero', 'voice-focus');
+          el.orbStage.classList.add('compact');
+          el.quickChips.classList.add('hidden');
+          if (el.scrollToChatBtn) el.scrollToChatBtn.classList.add('hidden');
+        } else {
+          el.orbStage.classList.remove('compact', 'voice-focus');
+          el.orbStage.classList.add('hero');
+          el.quickChips.classList.remove('hidden');
+          if (el.scrollToChatBtn) el.scrollToChatBtn.classList.add('hidden');
+        }
+        setTimeout(resizeCanvas, 120);
+        setTimeout(resizeCanvas, 380);
+        setTimeout(resizeCanvas, 600);
       }
 
       function setChatActive(active) {
         appState.hasMessages = active;
-        if (active) {
-          el.orbStage.classList.remove('hero'); el.orbStage.classList.add('compact');
-          el.quickChips.classList.add('hidden');
-        } else {
-          el.orbStage.classList.remove('compact'); el.orbStage.classList.add('hero');
-          el.orbCaption.classList.remove('opacity-0'); el.quickChips.classList.remove('hidden');
-        }
-        setTimeout(resizeCanvas, 320);
-        setTimeout(resizeCanvas, 580);
+        updateChatLayout(false);
       }
 
       function appendMessage(role, text) {
@@ -911,13 +1057,23 @@
 
         el.messagesList.appendChild(row);
         if (window.lucide) lucide.createIcons();
-        requestAnimationFrame(function () {
-          if (role === 'bot') {
-            row.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } else {
-            el.chatStream.scrollTo({ top: el.chatStream.scrollHeight, behavior: 'smooth' });
+        if (voiceConversationActive) {
+          updateChatLayout(false);
+          // Stay focused on the full-screen Orb if user has not scrolled down to read messages
+          if (el.chatStream.scrollTop > 120) {
+            requestAnimationFrame(function () {
+              row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
           }
-        });
+        } else {
+          requestAnimationFrame(function () {
+            if (role === 'bot') {
+              row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+              el.chatStream.scrollTo({ top: el.chatStream.scrollHeight, behavior: 'smooth' });
+            }
+          });
+        }
         return row;
       }
 
@@ -929,9 +1085,16 @@
         return 'สวัสดีค่ะแกรนด์ ตอนนี้หน้าเว็บพร้อมใช้งานไมโครโฟนเต็มรูปแบบแล้วค่ะ เมื่อนำไฟล์นี้ไปวางบน **GitHub Pages** หรือ **Cloudflare Pages** แล้วใส่ Apps Script URL + Access PIN ในแท็บ **ตั้งค่า** ก็คุยด้วยเสียงกับระบบจริงของแกรนด์ได้ทันทีเลยนะคะ';
       }
 
-      async function sendMessage(overrideText) {
+      async function sendMessage(overrideText, options) {
         const text = String(overrideText !== undefined ? overrideText : el.input.value).trim();
         if (!text || appState.busy) return;
+        const fromVoice = Boolean(options && options.fromVoice);
+        if (!fromVoice) {
+          voiceConversationActive = false;
+          clearVoiceTimers();
+          stopMicAudioMeter();
+          updateChatLayout(false);
+        }
         if (appState.activeTab !== 'chat') switchTab('chat');
 
         stopSpeaking();
@@ -947,30 +1110,50 @@
         if (isLiveApiConfigured()) {
           try {
             const res = await callBackendApi('chat', { text: text });
+            appState.busy = false;
+            el.sendBtn.disabled = false;
             if (res && res.ok) {
               appendMessage('bot', res.reply);
-              if (voiceReplyEnabled) speakText(res.reply);
-              else { setOrbMode('speaking'); setTimeout(function () { setOrbMode('idle'); }, 1100); }
+              const resumeAfter = fromVoice && voiceConversationActive && handsFreeEnabled;
+              if (voiceReplyEnabled) {
+                speakText(res.reply, { resumeAfter: resumeAfter });
+              } else {
+                setOrbMode('speaking');
+                setTimeout(function () {
+                  setOrbMode('idle');
+                  if (resumeAfter) scheduleResumeListening();
+                }, 1100);
+              }
             } else {
+              voiceConversationActive = false;
               setOrbMode('idle');
               appendMessage('error', (res && res.error) ? res.error : 'เชื่อมต่อไม่สำเร็จค่ะ');
             }
           } catch (err) {
+            appState.busy = false;
+            el.sendBtn.disabled = false;
+            voiceConversationActive = false;
             setOrbMode('idle');
             appendMessage('error', 'เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + (err.message || err));
           }
-          appState.busy = false;
-          el.sendBtn.disabled = false;
-          el.input.focus();
+          if (!fromVoice) el.input.focus();
         } else {
           setTimeout(function () {
-            const reply = simulatePreviewReply(text);
-            appendMessage('bot', reply);
-            if (voiceReplyEnabled) speakText(reply);
-            else { setOrbMode('speaking'); setTimeout(function () { setOrbMode('idle'); }, 1100); }
             appState.busy = false;
             el.sendBtn.disabled = false;
-            el.input.focus();
+            const reply = simulatePreviewReply(text);
+            appendMessage('bot', reply);
+            const resumeAfter = fromVoice && voiceConversationActive && handsFreeEnabled;
+            if (voiceReplyEnabled) {
+              speakText(reply, { resumeAfter: resumeAfter });
+            } else {
+              setOrbMode('speaking');
+              setTimeout(function () {
+                setOrbMode('idle');
+                if (resumeAfter) scheduleResumeListening();
+              }, 1100);
+            }
+            if (!fromVoice) el.input.focus();
           }, 900);
         }
       }
@@ -982,13 +1165,27 @@
         if (window.lucide) lucide.createIcons();
       }
 
-      function toggleMicListening() {
+      function commitVoiceTranscript() {
+        if (silenceSendTimer) { clearTimeout(silenceSendTimer); silenceSendTimer = null; }
+        const spokenText = latestVoiceTranscript.trim();
+        if (voiceSentForTurn || !spokenText || appState.busy) return;
+        voiceSentForTurn = true;
+        latestVoiceTranscript = '';
+        if (recognition && isListening) {
+          try { recognition.stop(); } catch (e) {}
+        }
+        sendMessage(spokenText, { fromVoice: true });
+      }
+
+      function startMicListening(isAutoResume) {
         if (!SpeechRecognition) {
-          showToast('เบราว์เซอร์นี้ยังไม่รองรับ Web Speech API ค่ะ แนะนำเปิดบน Chrome ค่ะ');
+          showToast('เบราว์เซอร์นี้ยังไม่รองรับ Web Speech API ค่ะ แนะนำเปิดบน Chrome หรือ Edge ค่ะ');
           return;
         }
-        if (isListening && recognition) { recognition.stop(); return; }
+        clearVoiceTimers();
         stopSpeaking();
+        latestVoiceTranscript = '';
+        voiceSentForTurn = false;
         recognition = new SpeechRecognition();
         recognition.lang = 'th-TH';
         recognition.interimResults = true;
@@ -997,29 +1194,77 @@
           isListening = true;
           el.micBtn.classList.add('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
           setOrbMode('listening');
-          showToast('กำลังฟังอยู่ค่ะ พูดได้เลยนะคะ');
+          startMicAudioMeter();
+          if (!isAutoResume) {
+            showToast(handsFreeEnabled ? 'กำลังฟังค่ะ พูดจบแล้วส่งอัตโนมัติเลยนะคะ' : 'กำลังฟังอยู่ค่ะ พูดได้เลยนะคะ');
+          }
         };
         recognition.onresult = function (event) {
-          let transcript = '', isFinal = false;
-          for (let i = event.resultIndex; i < event.results.length; i++) {
+          let transcript = '', hasFinal = false;
+          for (let i = 0; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript;
-            if (event.results[i].isFinal) isFinal = true;
+            if (event.results[i].isFinal) hasFinal = true;
           }
-          el.input.value = transcript;
-          if (isFinal && transcript.trim()) sendMessage(transcript.trim());
+          latestVoiceTranscript = transcript.trim();
+          el.input.value = latestVoiceTranscript;
+          if (silenceSendTimer) clearTimeout(silenceSendTimer);
+          if (hasFinal && latestVoiceTranscript) {
+            commitVoiceTranscript();
+          } else if (latestVoiceTranscript) {
+            silenceSendTimer = setTimeout(commitVoiceTranscript, 1250);
+          }
         };
         recognition.onerror = function (ev) {
           isListening = false;
+          clearVoiceTimers();
+          stopMicAudioMeter();
           el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
           if (!appState.busy) setOrbMode('idle');
-          showToast('ไม่สามารถใช้ไมโครโฟนได้ (' + (ev.error || 'blocked') + ') กรุณาอนุญาตสิทธิ์ไมค์ในเบราว์เซอร์นะคะ');
+          const code = ev && ev.error ? ev.error : 'blocked';
+          if (code === 'aborted') return;
+          voiceConversationActive = false;
+          updateChatLayout(false);
+          if (code === 'no-speech') {
+            showToast('ไม่ได้ยินเสียงพูดค่ะ กดไมค์เมื่อต้องการคุยต่อนะคะ');
+          } else {
+            showToast('ไม่สามารถใช้ไมโครโฟนได้ (' + code + ') กรุณาอนุญาตสิทธิ์ไมค์ในเบราว์เซอร์นะคะ');
+          }
         };
         recognition.onend = function () {
           isListening = false;
+          stopMicAudioMeter();
           el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
+          if (!voiceSentForTurn && latestVoiceTranscript.trim() && !appState.busy) {
+            commitVoiceTranscript();
+            return;
+          }
           if (!appState.busy) setOrbMode('idle');
         };
-        try { recognition.start(); } catch (e) { isListening = false; }
+        try { recognition.start(); } catch (e) { isListening = false; voiceConversationActive = false; stopMicAudioMeter(); updateChatLayout(false); }
+      }
+
+      function toggleMicListening() {
+        if (!SpeechRecognition) {
+          showToast('เบราว์เซอร์นี้ยังไม่รองรับ Web Speech API ค่ะ แนะนำเปิดบน Chrome หรือ Edge ค่ะ');
+          return;
+        }
+        if (isListening || voiceConversationActive) {
+          voiceConversationActive = false;
+          clearVoiceTimers();
+          stopMicAudioMeter();
+          stopSpeaking();
+          if (recognition && isListening) {
+            try { recognition.stop(); } catch (e) {}
+          }
+          el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
+          if (!appState.busy) setOrbMode('idle');
+          updateChatLayout(false);
+          showToast('หยุดโหมดคุยด้วยเสียงแล้วค่ะ');
+          return;
+        }
+        voiceConversationActive = true;
+        updateChatLayout(true);
+        startMicListening(false);
       }
 
       async function initLiveSession() {
@@ -1063,8 +1308,20 @@
       el.micBtn.addEventListener('click', toggleMicListening);
       el.toggleToolsBtn.addEventListener('click', function () { el.toolsDrawer.classList.toggle('hidden'); });
       el.resetChatBtn.addEventListener('click', function () {
+        voiceConversationActive = false; clearVoiceTimers(); stopMicAudioMeter();
+        if (recognition && isListening) { try { recognition.stop(); } catch (e) {} }
         stopSpeaking(); switchTab('chat'); el.messagesList.innerHTML = ''; setChatActive(false); setOrbMode('idle');
       });
+      if (el.scrollToChatBtn) {
+        el.scrollToChatBtn.addEventListener('click', function () {
+          const wrap = document.getElementById('messagesWrap');
+          if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+      if (typeof ResizeObserver !== 'undefined' && el.orbStage) {
+        const orbRo = new ResizeObserver(function () { resizeCanvas(); });
+        orbRo.observe(el.orbStage);
+      }
       el.sendBtn.addEventListener('click', function () { sendMessage(); });
       el.input.addEventListener('input', function () {
         el.input.style.height = 'auto';
@@ -1167,6 +1424,13 @@
         el.speechPitchVal.textContent = speechPitch.toFixed(2);
         try { localStorage.setItem('nadia_speech_pitch', String(speechPitch)); } catch (e) {}
       });
+      if (el.settingHandsFree) {
+        el.settingHandsFree.addEventListener('change', function () {
+          handsFreeEnabled = el.settingHandsFree.checked;
+          try { localStorage.setItem('nadia_hands_free', handsFreeEnabled ? 'on' : 'off'); } catch (e) {}
+          showToast(handsFreeEnabled ? 'เปิดโหมดคุยโต้ตอบต่อเนื่องแล้วค่ะ' : 'ปิดโหมดเปิดไมค์ต่อเนื่องแล้วค่ะ');
+        });
+      }
 
       el.settingsForm.addEventListener('submit', async function (e) {
         e.preventDefault();
