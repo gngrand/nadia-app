@@ -219,9 +219,13 @@
             <label for="apiPinInput" class="block text-xs text-white/65">Access PIN (ตรงกับ NADIA_ACCESS_PIN ใน Script Properties)</label>
             <input id="apiPinInput" type="password" placeholder="ใส่รหัส PIN ส่วนตัวของแกรนด์" class="w-full px-3.5 py-2.5 rounded-2xl border border-white/10 bg-black/60 text-xs sm:text-sm text-white placeholder:text-white/30 outline-none focus:border-emerald-400/60" />
           </div>
-          <div class="flex justify-end gap-2 pt-1">
+          <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <button type="button" id="copySyncLinkBtn" class="px-4 py-2 rounded-full text-xs font-medium bg-white/[0.06] hover:bg-emerald-500/15 text-emerald-200 border border-emerald-400/30 transition inline-flex items-center gap-1.5">
+              <i data-lucide="share-2" class="w-3.5 h-3.5"></i> คัดลอกลิงก์ซิงก์ข้ามเครื่อง
+            </button>
             <button type="submit" class="px-5 py-2 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-400 text-black hover:brightness-110 transition">บันทึกและทดสอบการเชื่อมต่อ</button>
           </div>
+          <p class="text-[11px] text-white/40 leading-relaxed">เคล็ดลับ: กดคัดลอกลิงก์ซิงก์แล้วเซฟเป็น Bookmark ส่วนตัว เพื่อเปิดใช้งานบนมือถือหรือเครื่องอื่นได้ทันทีโดยไม่ต้องกรอก URL, PIN และค่าเสียงซ้ำค่ะ</p>
         </form>
 
         <!-- AI Model & Voice Settings -->
@@ -941,6 +945,7 @@
         apiUrlInput: document.getElementById('apiUrlInput'),
         apiPinInput: document.getElementById('apiPinInput'),
         connStatusBadge: document.getElementById('connStatusBadge'),
+        copySyncLinkBtn: document.getElementById('copySyncLinkBtn'),
         settingsForm: document.getElementById('settingsForm'),
         settingModel: document.getElementById('settingModel'),
         settingMemoryWindow: document.getElementById('settingMemoryWindow'),
@@ -1403,6 +1408,71 @@
         startMicListening(false);
       }
 
+      function encodeSyncPayload(obj) {
+        const json = JSON.stringify(obj);
+        const bytes = new TextEncoder().encode(json);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+
+      function decodeSyncPayload(b64) {
+        const norm = b64.replace(/-/g, '+').replace(/_/g, '/');
+        const bin = atob(norm);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return JSON.parse(new TextDecoder().decode(bytes));
+      }
+
+      function importSyncHashIfPresent() {
+        try {
+          const hash = window.location.hash || '';
+          if (hash.indexOf('#setup=') !== 0) return false;
+          const raw = hash.slice('#setup='.length).trim();
+          if (!raw) return false;
+          const cfg = decodeSyncPayload(raw);
+          if (cfg && typeof cfg === 'object') {
+            if (cfg.u && String(cfg.u).indexOf('https://') === 0) {
+              appState.apiUrl = String(cfg.u).trim();
+              try { localStorage.setItem('nadia_api_url', appState.apiUrl); } catch (e) {}
+            }
+            if (cfg.p) {
+              appState.apiPin = String(cfg.p).trim();
+              try { localStorage.setItem('nadia_api_pin', appState.apiPin); } catch (e) {}
+            }
+            if (typeof cfg.v === 'string') {
+              selectedVoiceName = cfg.v;
+              try { localStorage.setItem('nadia_voice_name', selectedVoiceName); } catch (e) {}
+            }
+            if (typeof cfg.r === 'number' && !isNaN(cfg.r)) {
+              speechRate = cfg.r;
+              try { localStorage.setItem('nadia_speech_rate', String(speechRate)); } catch (e) {}
+            }
+            if (typeof cfg.pi === 'number' && !isNaN(cfg.pi)) {
+              speechPitch = cfg.pi;
+              try { localStorage.setItem('nadia_speech_pitch', String(speechPitch)); } catch (e) {}
+            }
+            if (typeof cfg.hf === 'boolean') {
+              handsFreeEnabled = cfg.hf;
+              try { localStorage.setItem('nadia_hands_free', handsFreeEnabled ? 'on' : 'off'); } catch (e) {}
+            }
+            if (typeof cfg.vr === 'boolean') {
+              voiceReplyEnabled = cfg.vr;
+              try { localStorage.setItem('nadia_voice_reply', voiceReplyEnabled ? 'on' : 'off'); } catch (e) {}
+            }
+            // Immediately scrub #setup=... from address bar so PIN is never left visible
+            if (window.history && window.history.replaceState) {
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+            updateVoiceReplyToggleUI();
+            populateVoiceSelect();
+            showToast('ซิงก์การเชื่อมต่อและค่าเสียงเรียบร้อยแล้วค่ะ!');
+            return true;
+          }
+        } catch (err) {}
+        return false;
+      }
+
       async function initLiveSession() {
         if (!isLiveApiConfigured()) { updateConnBadge(false); return; }
         try {
@@ -1412,6 +1482,22 @@
             appState.model = data.model || 'gemini-4-hydrogen';
             appState.memoryWindow = data.memoryWindow || 10;
             appState.systemPrompt = data.systemPrompt || appState.systemPrompt;
+            if (typeof data.voiceName === 'string' && !selectedVoiceName) {
+              selectedVoiceName = data.voiceName;
+              try { localStorage.setItem('nadia_voice_name', selectedVoiceName); } catch (e) {}
+            }
+            if (typeof data.speechRate === 'number' && !isNaN(data.speechRate)) {
+              speechRate = data.speechRate;
+              try { localStorage.setItem('nadia_speech_rate', String(speechRate)); } catch (e) {}
+            }
+            if (typeof data.speechPitch === 'number' && !isNaN(data.speechPitch)) {
+              speechPitch = data.speechPitch;
+              try { localStorage.setItem('nadia_speech_pitch', String(speechPitch)); } catch (e) {}
+            }
+            if (typeof data.handsFree === 'boolean') {
+              handsFreeEnabled = data.handsFree;
+              try { localStorage.setItem('nadia_hands_free', handsFreeEnabled ? 'on' : 'off'); } catch (e) {}
+            }
             el.agentTitle.textContent = (data.agentName || 'NADIA').toUpperCase();
             el.modelLabel.textContent = appState.model;
             // Keep initial screen clean on the Hero Orb; old turns stay saved in Memory_Log
@@ -1525,6 +1611,38 @@
         if (appState.connected) showToast('เชื่อมต่อกับ Nadia สำเร็จแล้วค่ะ!');
       });
 
+      if (el.copySyncLinkBtn) {
+        el.copySyncLinkBtn.addEventListener('click', function () {
+          const url = (el.apiUrlInput.value || appState.apiUrl || '').trim();
+          const pin = (el.apiPinInput.value || appState.apiPin || '').trim();
+          if (!url || url.indexOf('https://') !== 0 || !pin) {
+            showToast('กรุณากรอก Apps Script URL และ Access PIN ก่อนสร้างลิงก์ซิงก์นะคะ');
+            return;
+          }
+          appState.apiUrl = url;
+          appState.apiPin = pin;
+          try {
+            localStorage.setItem('nadia_api_url', url);
+            localStorage.setItem('nadia_api_pin', pin);
+          } catch (e) {}
+          const token = encodeSyncPayload({
+            u: url,
+            p: pin,
+            v: selectedVoiceName,
+            r: speechRate,
+            pi: speechPitch,
+            hf: handsFreeEnabled,
+            vr: voiceReplyEnabled
+          });
+          const base = (window.location.origin && window.location.origin !== 'null')
+            ? (window.location.origin + window.location.pathname)
+            : 'https://gngrand.github.io/nadia-app/';
+          const syncUrl = base + '#setup=' + token;
+          copyText(syncUrl);
+          showToast('คัดลอกลิงก์ซิงก์แล้วค่ะ เซฟเป็น Bookmark ส่วนตัวเพื่อเปิดบนเครื่องอื่นได้เลยนะคะ');
+        });
+      }
+
       el.settingMemoryWindow.addEventListener('input', function () {
         el.memoryWindowVal.textContent = el.settingMemoryWindow.value + ' รอบ';
       });
@@ -1568,7 +1686,15 @@
         if (isLiveApiConfigured()) {
           try {
             const res = await callBackendApi('settings_update', {
-              settings: { model: appState.model, memoryWindow: appState.memoryWindow, systemPrompt: appState.systemPrompt }
+              settings: {
+                model: appState.model,
+                memoryWindow: appState.memoryWindow,
+                systemPrompt: appState.systemPrompt,
+                voiceName: selectedVoiceName,
+                speechRate: speechRate,
+                speechPitch: speechPitch,
+                handsFree: handsFreeEnabled
+              }
             });
             showToast(res && res.ok ? 'บันทึกการตั้งค่าลงชีต Config แล้วค่ะ' : (res.error || 'บันทึกไม่สำเร็จค่ะ'));
           } catch (err) { showToast(err.message); }
@@ -1577,6 +1703,7 @@
         }
       });
 
+      importSyncHashIfPresent();
       updateVoiceReplyToggleUI();
       if (window.lucide) lucide.createIcons();
       window.addEventListener('load', function () {
