@@ -144,10 +144,6 @@
       <main id="chatStream" class="flex-1 overflow-y-auto chat-scroll select-text relative">
         <section id="orbStage" class="orb-stage hero relative w-full flex flex-col items-center justify-center shrink-0">
           <canvas id="orbCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
-          <button id="scrollToChatBtn" type="button" class="hidden absolute bottom-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] text-white/45 hover:text-emerald-300 hover:border-emerald-400/30 transition" title="เลื่อนลงเพื่อดูข้อความ">
-            <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
-            <span>เลื่อนลงดูข้อความ</span>
-          </button>
         </section>
 
         <div id="messagesWrap" class="px-4 sm:px-6 pb-8 pt-2">
@@ -156,15 +152,7 @@
       </main>
 
       <div class="px-4 sm:px-6 pb-3 pt-1 shrink-0 bg-gradient-to-t from-black via-black/95 to-transparent">
-        <div class="max-w-2xl mx-auto space-y-2.5">
-          <div id="quickChips" class="flex items-center justify-center flex-wrap gap-1.5 transition-opacity duration-300">
-            <button data-cmd="/summary" class="tool-cmd px-3.5 py-1.5 rounded-full text-xs text-white/60 hover:text-emerald-200 border border-white/[0.08] hover:border-emerald-400/45 bg-white/[0.03] hover:bg-emerald-500/10 transition">สรุปยอดและงาน</button>
-            <button data-cmd="/email" class="tool-cmd px-3.5 py-1.5 rounded-full text-xs text-white/60 hover:text-teal-200 border border-white/[0.08] hover:border-teal-400/45 bg-white/[0.03] hover:bg-teal-500/10 transition">สรุปอีเมลใหม่</button>
-            <button id="chipAnalyzeBtn" class="px-3.5 py-1.5 rounded-full text-xs text-white/60 hover:text-lime-200 border border-white/[0.08] hover:border-lime-400/45 bg-white/[0.03] hover:bg-lime-500/10 transition">วิเคราะห์หลายมุม</button>
-            <button id="chipLedgerBtn" class="px-3.5 py-1.5 rounded-full text-xs text-white/60 hover:text-emerald-200 border border-white/[0.08] hover:border-emerald-400/45 bg-white/[0.03] hover:bg-emerald-500/10 transition">จดรายรับ-รายจ่าย</button>
-            <button id="chipTaskBtn" class="px-3.5 py-1.5 rounded-full text-xs text-white/60 hover:text-emerald-200 border border-white/[0.08] hover:border-emerald-400/45 bg-white/[0.03] hover:bg-emerald-500/10 transition">เพิ่มงานใหม่</button>
-          </div>
-
+        <div class="max-w-2xl mx-auto">
           <div class="glass-pill rounded-full px-3 py-1.5 flex items-end gap-1.5 transition">
             <button id="plusActionBtn" class="w-9 h-9 rounded-full flex items-center justify-center text-white/50 hover:text-emerald-300 hover:bg-emerald-500/10 transition shrink-0" title="บันทึกรายการด่วน" aria-label="เพิ่มรายการ">
               <i data-lucide="plus" class="w-4 h-4"></i>
@@ -383,34 +371,178 @@
   <script>
     (function () {
       // ======================================================================
-      // 1. 3D ANIMATED PARTICLE ORB ENGINE (Smooth Round Emerald Sphere)
+      // 1. 3D ULTRA-CRISP ROUND-PARTICLE EMERALD NEBULA & SPHERICAL CORE ENGINE
       // ======================================================================
       const canvas = document.getElementById('orbCanvas');
       const ctx = canvas.getContext('2d');
 
       const orbState = {
         mode: 'idle', energy: 0.0, targetEnergy: 0.0, thinkPhase: 0.0,
-        voiceAmp: 0.0, speakPulse: 0.0,
-        time: 0, rotY: 0, rotX: 0.22, targetMouseX: 0, targetMouseY: 0,
+        voiceAmp: 0.0, listenPulse: 0.0, speakPulse: 0.0,
+        time: 0, rotY: 0, rotX: 0.16, targetMouseX: 0, targetMouseY: 0,
         mouseX: 0, mouseY: 0, isDragging: false, lastDragX: 0, lastDragY: 0,
-        pulseRings: [], ringSpawnTimer: 0, rafId: null
+        rafId: null
       };
 
-      const LAT_BANDS = 48;
-      const LON_STEPS = 80;
-      const points = [];
-      for (let i = 1; i < LAT_BANDS; i++) {
-        const theta = (i / LAT_BANDS) * Math.PI;
-        const sinT = Math.sin(theta), cosT = Math.cos(theta);
-        const ringCount = Math.max(10, Math.round(LON_STEPS * sinT));
-        for (let j = 0; j < ringCount; j++) {
-          const phi = (j / ringCount) * Math.PI * 2;
-          points.push({ theta: theta, phi: phi, nx: sinT * Math.cos(phi), ny: cosT, nz: sinT * Math.sin(phi) });
+      let seed = 421974;
+      function rand() {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        return seed / 4294967296;
+      }
+
+      // 8-level crisp Emerald -> Mint -> Lime -> White-Mint palette
+      const BUCKET_RGBA = [
+        [6, 110, 80, 0.38],      // 0: Deep forest-emerald valley
+        [12, 155, 114, 0.50],    // 1: Dark emerald membrane
+        [20, 192, 134, 0.62],    // 2: Pure emerald filament
+        [48, 218, 154, 0.74],    // 3: Bright emerald-mint fold
+        [92, 236, 176, 0.84],    // 4: Luminous mint-emerald crest
+        [142, 246, 188, 0.92],   // 5: Vibrant lime-mint ridge
+        [202, 252, 222, 0.96],   // 6: Bright white-lime highlight
+        [242, 254, 246, 1.00]    // 7: Crisp white-mint core sphere
+      ];
+
+      // Pre-render ultra-crisp anti-aliased ROUND micro-sphere sprites (zero square pixel edges!)
+      const dotSprites = BUCKET_RGBA.map(function (c) {
+        const sc = document.createElement('canvas');
+        sc.width = 16;
+        sc.height = 16;
+        const sctx = sc.getContext('2d');
+        const g = sctx.createRadialGradient(8, 8, 0.4, 8, 8, 7.6);
+        g.addColorStop(0.0, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + c[3] + ')');
+        g.addColorStop(0.48, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (c[3] * 0.92).toFixed(3) + ')');
+        g.addColorStop(0.72, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (c[3] * 0.28).toFixed(3) + ')');
+        g.addColorStop(1.0, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0)');
+        sctx.fillStyle = g;
+        sctx.beginPath();
+        sctx.arc(8, 8, 7.6, 0, Math.PI * 2);
+        sctx.fill();
+        return sc;
+      });
+
+      // Pinpoint starlight bloom sprite for brightest round sparks
+      const glowSprite = document.createElement('canvas');
+      glowSprite.width = 20;
+      glowSprite.height = 20;
+      const gctx = glowSprite.getContext('2d');
+      const sg = gctx.createRadialGradient(10, 10, 0.4, 10, 10, 10);
+      sg.addColorStop(0, 'rgba(240, 253, 244, 0.95)');
+      sg.addColorStop(0.25, 'rgba(134, 239, 172, 0.55)');
+      sg.addColorStop(0.6, 'rgba(16, 185, 129, 0.12)');
+      sg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      gctx.fillStyle = sg;
+      gctx.fillRect(0, 0, 20, 20);
+
+      // Build 3 crisp round-particle layers:
+      // Layer 0: Crisp round spherical luminous core (2,400 round micro-spheres)
+      // Layer 1: 320 finely woven 3D geodesic silk ribbons x 36 round micro-spheres (11,520 pts)
+      // Layer 2: Crisp round outer stardust mist drifting softly off the billows (2,480 pts)
+      const CORE_COUNT = 2400;
+      const RIBBON_COUNT = 320;
+      const PTS_PER_RIBBON = 36;
+      const SHELL_COUNT = RIBBON_COUNT * PTS_PER_RIBBON;
+      const MIST_COUNT = 2480;
+      const TOTAL_PARTICLES = CORE_COUNT + SHELL_COUNT + MIST_COUNT;
+      const particles = new Array(TOTAL_PARTICLES);
+      const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+      let idx = 0;
+      // Layer 0: Crisp Round Spherical Energy Core (Fibonacci outer shell + sparkling inner core)
+      for (let i = 0; i < CORE_COUNT; i++) {
+        const isShell = i < 1650;
+        let nx, ny, nz, rad, bright;
+        if (isShell) {
+          ny = 1 - ((i + 0.5) / 1650) * 2;
+          const sr = Math.sqrt(Math.max(0, 1 - ny * ny));
+          const phi = i * GOLDEN_ANGLE;
+          nx = Math.cos(phi) * sr;
+          nz = Math.sin(phi) * sr;
+          rad = 0.31 + (rand() - 0.5) * 0.035;
+          bright = 0.84 + rand() * 0.16;
+        } else {
+          const u = rand() * 2 - 1;
+          const sr = Math.sqrt(Math.max(0, 1 - u * u));
+          const phi = rand() * Math.PI * 2;
+          nx = Math.cos(phi) * sr;
+          ny = u;
+          nz = Math.sin(phi) * sr;
+          rad = Math.pow(rand(), 0.55) * 0.29;
+          bright = 0.68 + rand() * 0.32;
+        }
+        particles[idx++] = {
+          layer: 0, nx: nx, ny: ny, nz: nz,
+          baseR: rad, phase: rand() * Math.PI * 2,
+          size: 1.55 + rand() * 1.15, bright: bright, spark: rand() > 0.90
+        };
+      }
+
+      // Layer 1: Uniform 3D geodesic silk ribbons of crisp round micro-spheres
+      for (let rIdx = 0; rIdx < RIBBON_COUNT; rIdx++) {
+        const sy = 1 - ((rIdx + 0.5) / RIBBON_COUNT) * 2;
+        const sr = Math.sqrt(Math.max(0, 1 - sy * sy));
+        const sp = rIdx * GOLDEN_ANGLE;
+        let vx = Math.cos(sp) * sr, vy = sy, vz = Math.sin(sp) * sr;
+
+        let ax = rand() * 2 - 1, ay = rand() * 2 - 1, az = rand() * 2 - 1;
+        let kx = ay * vz - az * vy, ky = az * vx - ax * vz, kz = ax * vy - ay * vx;
+        const kLen = Math.hypot(kx, ky, kz) || 1;
+        kx /= kLen; ky /= kLen; kz /= kLen;
+
+        const tier = rIdx % 5;
+        const baseShell = tier === 0 ? (0.54 + rand() * 0.14) : (tier === 1 ? (0.72 + rand() * 0.12) : (0.85 + rand() * 0.18));
+        const stepAng = 0.017 + rand() * 0.017;
+        const rPhase = rand() * Math.PI * 2;
+        const cosA = Math.cos(stepAng), sinA = Math.sin(stepAng);
+
+        for (let k = 0; k < PTS_PER_RIBBON; k++) {
+          const frac = k / (PTS_PER_RIBBON - 1);
+          const wave = Math.sin(frac * 6.0 + rPhase) * 0.05;
+          let px = vx + kx * wave + (rand() - 0.5) * 0.018;
+          let py = vy + ky * wave + (rand() - 0.5) * 0.018;
+          let pz = vz + kz * wave + (rand() - 0.5) * 0.018;
+          const pLen = Math.hypot(px, py, pz) || 1;
+          px /= pLen; py /= pLen; pz /= pLen;
+
+          particles[idx++] = {
+            layer: 1, nx: px, ny: py, nz: pz,
+            baseR: baseShell + (rand() - 0.5) * 0.03,
+            phase: rPhase + frac * 2.0,
+            size: 1.35 + rand() * 1.15,
+            bright: 0.55 + Math.sin(frac * Math.PI) * 0.45,
+            spark: (k === 18 && rIdx % 6 === 0)
+          };
+
+          const cxv = ky * vz - kz * vy;
+          const cyv = kz * vx - kx * vz;
+          const czv = kx * vy - ky * vx;
+          const nvx = vx * cosA + cxv * sinA;
+          const nvy = vy * cosA + cyv * sinA;
+          const nvz = vz * cosA + czv * sinA;
+          const vLen = Math.hypot(nvx, nvy, nvz) || 1;
+          vx = nvx / vLen; vy = nvy / vLen; vz = nvz / vLen;
         }
       }
 
+      // Layer 2: Crisp tiny round outer stardust spheres
+      for (let i = 0; i < MIST_COUNT; i++) {
+        const u = rand() * 2 - 1;
+        const ringR = Math.sqrt(Math.max(0, 1 - u * u));
+        const phi = rand() * Math.PI * 2;
+        const nx = Math.cos(phi) * ringR;
+        const ny = u;
+        const nz = Math.sin(phi) * ringR;
+        const baseR = 0.98 + Math.pow(rand(), 1.35) * 0.40;
+        particles[idx++] = {
+          layer: 2, nx: nx, ny: ny, nz: nz,
+          baseR: baseR, phase: rand() * Math.PI * 2,
+          size: 1.15 + rand() * 1.05, bright: 0.35 + rand() * 0.55, spark: false
+        };
+      }
+
+      const buckets = BUCKET_RGBA.map(function () { return []; });
+
       function resizeCanvas() {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
         const rect = canvas.getBoundingClientRect();
         if (rect.width < 2 || rect.height < 2) return;
         canvas.width = Math.max(1, Math.floor(rect.width * dpr));
@@ -435,20 +567,18 @@
         }
       }
 
-      function waveDisplacement(nx, ny, nz, t, amp, energy, voiceAmp) {
-        // Multi-layered slow organic liquid folds + live voice-reactive ripples
-        const idleBreath = Math.sin(t * 0.65) * 0.028;
-        const w1 = Math.sin(nx * 2.1 + t * 0.62) * Math.cos(ny * 1.9 - t * 0.48);
-        const w2 = Math.sin(nz * 2.4 - t * 0.55) * Math.sin((nx - ny) * 1.8 + t * 0.42);
-        const w3 = Math.cos((ny + nz) * 2.9 + t * 0.78) * 0.52;
-        const drift = Math.sin((nx * nz) * 3.2 + t * 0.85) * 0.35;
-        const neural = energy > 0.02 ? Math.sin((nx * 4.8 + ny * 4.4 - nz * 4.2) + t * 3.4) * 0.12 * energy : 0;
-        const vocalRipple = voiceAmp > 0.01
-          ? (Math.sin((nx * 5.6 + ny * 4.8 - nz * 5.1) + t * 6.2) * 0.15 + Math.cos((ny * 6.4 - nz * 4.5) - t * 4.8) * 0.09) * voiceAmp
+      function nebulaField(nx, ny, nz, t, amp, energy, voiceAmp) {
+        const n1 = Math.sin(nx * 3.1 + t * 0.48) * Math.cos(ny * 2.9 - t * 0.42) * Math.sin(nz * 2.7 + t * 0.36);
+        const n2 = Math.sin((nx * 4.7 - nz * 4.2) + t * 0.62) * Math.cos((ny * 4.5 + nx * 3.1) - t * 0.51);
+        const n3 = Math.cos((nz * 6.2 + ny * 5.4) + t * 0.85) * 0.55;
+        const ridge1 = 1.0 - Math.abs(Math.sin(nx * 3.6 + ny * 3.2 - nz * 2.8 + t * 0.45));
+        const ridge2 = 1.0 - Math.abs(Math.cos(nx * 5.2 - ny * 4.8 + nz * 4.4 - t * 0.58));
+        const ridgeSharp = Math.pow(ridge1 * 0.6 + ridge2 * 0.4, 1.85);
+        const vocalWave = voiceAmp > 0.01
+          ? Math.sin((nx * 5.8 + ny * 5.1 - nz * 4.9) + t * 6.4) * 0.16 * voiceAmp
           : 0;
-        const vocalExpand = voiceAmp * 0.14;
-        const activeBreath = Math.sin(t * 2.6) * 0.045 * energy;
-        return 1 + idleBreath + activeBreath + vocalExpand + (w1 * 0.115 + w2 * 0.09 + w3 * 0.05 + drift * 0.04) * amp + neural + vocalRipple;
+        const disp = (n1 * 0.22 + n2 * 0.13 + n3 * 0.06) * amp + (ridgeSharp - 0.38) * 0.26 * amp + vocalWave;
+        return { disp: disp, ridge: ridgeSharp };
       }
 
       function renderOrb() {
@@ -460,102 +590,162 @@
         orbState.mouseX += (orbState.targetMouseX - orbState.mouseX) * 0.06;
         orbState.mouseY += (orbState.targetMouseY - orbState.mouseY) * 0.06;
 
-        // Live voice reactivity (real microphone RMS when listening, syllable-cadence envelope when speaking)
         if (orbState.mode === 'listening') {
-          const liveLevel = readMicVolumeLevel();
-          const targetV = liveLevel >= 0 ? liveLevel : (0.18 + 0.16 * Math.abs(Math.sin(orbState.time * 3.6)));
-          orbState.voiceAmp += (targetV - orbState.voiceAmp) * 0.28;
+          orbState.listenPulse *= 0.91;
+          const listenBase = 0.16 + 0.14 * Math.abs(Math.sin(orbState.time * 3.8));
+          const targetV = Math.min(1.0, listenBase + orbState.listenPulse * 0.85);
+          orbState.voiceAmp += (targetV - orbState.voiceAmp) * 0.26;
         } else if (orbState.mode === 'speaking') {
           orbState.speakPulse *= 0.88;
           const cadence = 0.24 + 0.36 * Math.abs(Math.sin(orbState.time * 4.8)) * (0.62 + 0.38 * Math.sin(orbState.time * 10.6));
           const targetS = Math.min(1.0, cadence + orbState.speakPulse * 0.62);
           orbState.voiceAmp += (targetS - orbState.voiceAmp) * 0.24;
         } else {
+          orbState.listenPulse *= 0.86;
           orbState.speakPulse *= 0.85;
           orbState.voiceAmp *= 0.90;
         }
 
         const e = orbState.energy;
         const va = orbState.voiceAmp;
-        orbState.time += 0.012 + e * 0.036 + va * 0.045;
-        orbState.thinkPhase += 0.05 + e * 0.11 + va * 0.16;
+        orbState.time += 0.0085 + e * 0.026 + va * 0.036;
+        orbState.thinkPhase += 0.045 + e * 0.10 + va * 0.14;
         if (!orbState.isDragging) {
-          orbState.rotY += 0.0032 + e * 0.016 + va * 0.022;
-          orbState.rotX = 0.22 + Math.sin(orbState.time * 0.38) * 0.14;
-          orbState.rotX += Math.sin(orbState.time * 0.8) * 0.0018 * (e + va);
+          orbState.rotY += 0.0024 + e * 0.012 + va * 0.016;
+          orbState.rotX = 0.16 + Math.sin(orbState.time * 0.34) * 0.11;
         }
 
-        const t = orbState.time, amp = 1.0 + e * 0.55 + va * 0.85;
+        const t = orbState.time;
+        const amp = 1.0 + e * 0.42 + va * 0.65;
         const cx = w * 0.5, cy = h * 0.5;
-        const baseRadius = Math.min(w, h) * 0.41;
-        const fov = baseRadius * 3.4;
+        const baseRadius = Math.min(w, h) * 0.39;
+        const fov = baseRadius * 3.6;
 
+        ctx.globalCompositeOperation = 'source-over';
         ctx.clearRect(0, 0, w, h);
 
-        const halo = ctx.createRadialGradient(cx, cy, baseRadius * 0.08, cx, cy, baseRadius * (1.35 + e * 0.38 + va * 0.45));
-        halo.addColorStop(0, 'rgba(52, 211, 153, ' + Math.min(0.45, 0.11 + e * 0.14 + va * 0.22).toFixed(3) + ')');
-        halo.addColorStop(0.5, 'rgba(16, 185, 129, ' + Math.min(0.28, 0.05 + e * 0.08 + va * 0.12).toFixed(3) + ')');
-        halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = halo;
+        // Soft emerald ambient glow
+        const outerGlow = ctx.createRadialGradient(cx, cy, baseRadius * 0.04, cx, cy, baseRadius * (1.38 + e * 0.24 + va * 0.30));
+        outerGlow.addColorStop(0, 'rgba(134, 239, 172, ' + Math.min(0.30, 0.14 + e * 0.08 + va * 0.12).toFixed(3) + ')');
+        outerGlow.addColorStop(0.26, 'rgba(16, 185, 129, ' + Math.min(0.20, 0.08 + e * 0.05 + va * 0.08).toFixed(3) + ')');
+        outerGlow.addColorStop(0.65, 'rgba(6, 78, 59, 0.04)');
+        outerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = outerGlow;
         ctx.fillRect(0, 0, w, h);
 
-        if (orbState.mode === 'thinking' || orbState.mode === 'listening' || orbState.mode === 'speaking') {
-          orbState.ringSpawnTimer += 1 + va * 1.4;
-          const ringThreshold = orbState.mode === 'thinking' ? 20 : (va > 0.22 ? 16 : 30);
-          if (orbState.ringSpawnTimer >= ringThreshold) {
-            orbState.ringSpawnTimer = 0;
-            orbState.pulseRings.push({ radius: baseRadius * (0.82 + va * 0.12), alpha: Math.min(0.75, 0.42 + va * 0.32) });
-          }
-        }
-        for (let rIdx = orbState.pulseRings.length - 1; rIdx >= 0; rIdx--) {
-          const ring = orbState.pulseRings[rIdx];
-          ring.radius += baseRadius * 0.018;
-          ring.alpha -= 0.013;
-          if (ring.alpha <= 0.01) orbState.pulseRings.splice(rIdx, 1);
-          else {
-            ctx.beginPath();
-            ctx.arc(cx, cy, ring.radius, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(110, 231, 183, ' + ring.alpha.toFixed(3) + ')';
-            ctx.lineWidth = 1.4;
-            ctx.stroke();
-          }
-        }
+        // Round spherical luminous inner core glow
+        const coreGlow = ctx.createRadialGradient(cx, cy, 1, cx, cy, baseRadius * (0.42 + e * 0.07 + va * 0.11));
+        coreGlow.addColorStop(0, 'rgba(240, 253, 244, ' + Math.min(0.58, 0.34 + e * 0.12 + va * 0.18).toFixed(3) + ')');
+        coreGlow.addColorStop(0.38, 'rgba(110, 231, 183, ' + Math.min(0.34, 0.18 + e * 0.08 + va * 0.12).toFixed(3) + ')');
+        coreGlow.addColorStop(0.75, 'rgba(16, 185, 129, 0.06)');
+        coreGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = coreGlow;
+        ctx.beginPath();
+        ctx.arc(cx, cy, baseRadius * 0.48, 0, Math.PI * 2);
+        ctx.fill();
 
-        const rx = orbState.rotX + orbState.mouseY * 0.35;
-        const ry = orbState.rotY + orbState.mouseX * 0.45;
+        for (let b = 0; b < buckets.length; b++) buckets[b].length = 0;
+        const glowSparks = [];
+
+        const rx = orbState.rotX + orbState.mouseY * 0.32;
+        const ry = orbState.rotY + orbState.mouseX * 0.42;
         const cosX = Math.cos(rx), sinX = Math.sin(rx);
         const cosY = Math.cos(ry), sinY = Math.sin(ry);
+        const sizeScale = baseRadius / 150;
+        const breath = 1.0 + Math.sin(t * 0.72) * 0.024 + va * 0.12;
 
-        const projected = new Array(points.length);
-        for (let i = 0; i < points.length; i++) {
-          const p = points[i];
-          const r = baseRadius * waveDisplacement(p.nx, p.ny, p.nz, t, amp, e, va);
-          const x0 = p.nx * r, y0 = p.ny * r, z0 = p.nz * r;
-          const x1 = x0 * cosY - z0 * sinY, z1 = x0 * sinY + z0 * cosY;
-          const y2 = y0 * cosX - z1 * sinX, z2 = y0 * sinX + z1 * cosX;
-          const scale = fov / (fov + z2 + baseRadius * 0.6);
-          projected[i] = { x: cx + x1 * scale, y: cy + y2 * scale, z: z2, depth: (z2 + baseRadius * 1.4) / (baseRadius * 2.8), ny: p.ny, nx: p.nx, rNorm: r / baseRadius };
+        for (let i = 0; i < TOTAL_PARTICLES; i++) {
+          const p = particles[i];
+          let x0, y0, z0, ridgeVal = 0.5;
+
+          if (p.layer === 0) {
+            // Crisp round spherical core with gentle organic breathing & voice expansion
+            const ripple = 1.0 + Math.sin(p.nx * 4.5 + p.ny * 4.2 + t * 2.0) * (0.045 + va * 0.11);
+            const r = baseRadius * p.baseR * breath * ripple;
+            x0 = p.nx * r;
+            y0 = p.ny * r;
+            z0 = p.nz * r;
+            const x1 = x0 * cosY - z0 * sinY;
+            const z1 = x0 * sinY + z0 * cosY;
+            const y2 = y0 * cosX - z1 * sinX;
+            const z2 = y0 * sinX + z1 * cosX;
+            const scale = fov / (fov + z2 + baseRadius * 0.65);
+            const sx = cx + x1 * scale;
+            const sy = cy + y2 * scale;
+            const front = Math.max(0, Math.min(1, 1 - (z2 + baseRadius * 0.5) / (baseRadius * 1.0)));
+            const d = Math.max(1.4, p.size * sizeScale * (0.72 + front * 0.55 + va * 0.25));
+            const bIdx = (front > 0.65 && p.bright > 0.80) ? 7 : (front > 0.42 ? 6 : 5);
+            buckets[bIdx].push(sx, sy, d);
+            if (p.spark && front > 0.55 && glowSparks.length < 160) glowSparks.push(sx, sy, d * 2.2);
+            continue;
+          } else if (p.layer === 1) {
+            const nf = nebulaField(p.nx, p.ny, p.nz, t, amp, e, va);
+            ridgeVal = nf.ridge;
+            const swirl = (ridgeVal - 0.4) * 0.18 * amp;
+            const px = p.nx - p.nz * swirl;
+            const py = p.ny + Math.sin(p.phase + t * 0.6) * 0.035;
+            const pz = p.nz + p.nx * swirl;
+            const r = baseRadius * p.baseR * breath * (1.0 + nf.disp);
+            x0 = px * r;
+            y0 = py * r;
+            z0 = pz * r;
+          } else {
+            const plume = Math.sin(p.nx * 3.4 + t * 0.42) * Math.cos(p.ny * 3.1 - t * 0.38) + Math.sin(p.nz * 3.8 + t * 0.5);
+            const drift = 0.06 * Math.sin(t * 0.75 + p.phase) + plume * 0.11 * amp + va * 0.15;
+            const r = baseRadius * (p.baseR + drift) * breath;
+            x0 = p.nx * r;
+            y0 = p.ny * r;
+            z0 = p.nz * r;
+            ridgeVal = Math.max(0, Math.min(1, 0.35 + plume * 0.25));
+          }
+
+          const x1 = x0 * cosY - z0 * sinY;
+          const z1 = x0 * sinY + z0 * cosY;
+          const y2 = y0 * cosX - z1 * sinX;
+          const z2 = y0 * sinX + z1 * cosX;
+          const scale = fov / (fov + z2 + baseRadius * 0.65);
+          const sx = cx + x1 * scale;
+          const sy = cy + y2 * scale;
+          const frontness = Math.max(0, Math.min(1, 1 - (z2 + baseRadius * 1.45) / (baseRadius * 2.9)));
+          const d = Math.max(1.25, p.size * sizeScale * (0.58 + frontness * 0.66 + ridgeVal * 0.38 + va * 0.24));
+
+          let bIdx;
+          if (p.layer === 2) {
+            bIdx = (frontness > 0.62 && ridgeVal > 0.48) ? 3 : (frontness > 0.42 ? 2 : (frontness > 0.22 ? 1 : 0));
+          } else {
+            const lum = ridgeVal * 0.64 + frontness * 0.34 + e * 0.08 + va * 0.15;
+            if (lum > 0.90) bIdx = 7;
+            else if (lum > 0.78) bIdx = 6;
+            else if (lum > 0.66) bIdx = 5;
+            else if (lum > 0.54) bIdx = 4;
+            else if (lum > 0.42) bIdx = 3;
+            else if (lum > 0.30) bIdx = 2;
+            else if (lum > 0.18) bIdx = 1;
+            else bIdx = 0;
+          }
+          buckets[bIdx].push(sx, sy, d);
+          if (p.spark && bIdx >= 5 && glowSparks.length < 200) {
+            glowSparks.push(sx, sy, d * 2.2);
+          }
         }
-        projected.sort(function (a, b) { return b.z - a.z; });
 
-        for (let i = 0; i < projected.length; i++) {
-          const pt = projected[i];
-          const frontness = Math.max(0, Math.min(1, 1 - pt.depth));
-          const limeMix = Math.max(0, Math.min(1, (pt.ny * 0.52 + 0.46) + (1 - frontness) * 0.22 + Math.sin(t * 1.4 + pt.nx * 2.2) * (0.09 + e * 0.14)));
-          const thinkGlow = e * (0.5 + 0.5 * Math.sin(orbState.thinkPhase + pt.nx * 3.5 + pt.ny * 3.5));
-
-          const rCol = Math.min(255, Math.round(24 + limeMix * 135 + thinkGlow * 55));
-          const gCol = Math.min(255, Math.round(215 + limeMix * 32 + thinkGlow * 25));
-          const bCol = Math.max(70, Math.round(188 - limeMix * 96 + thinkGlow * 25));
-          const ridgeBoost = Math.max(0, (pt.rNorm - 0.92) * 1.5);
-          const alpha = Math.min(0.99, 0.15 + frontness * 0.70 + ridgeBoost * 0.24 + thinkGlow * 0.14 + va * 0.22);
-          const dotRadius = Math.max(0.75, (0.85 + frontness * 1.22 + ridgeBoost * 0.55 + thinkGlow * 0.32 + va * 0.52) * (baseRadius / 120));
-
-          ctx.fillStyle = 'rgba(' + rCol + ',' + gCol + ',' + bCol + ',' + alpha.toFixed(3) + ')';
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, dotRadius, 0, Math.PI * 2);
-          ctx.fill();
+        // Additive rendering of crisp anti-aliased ROUND micro-spheres
+        ctx.globalCompositeOperation = 'lighter';
+        for (let b = 0; b < buckets.length; b++) {
+          const arr = buckets[b];
+          if (!arr.length) continue;
+          const sprite = dotSprites[b];
+          for (let j = 0; j < arr.length; j += 3) {
+            const px = arr[j], py = arr[j + 1], pd = arr[j + 2];
+            ctx.drawImage(sprite, px - pd * 0.5, py - pd * 0.5, pd, pd);
+          }
         }
+        for (let k = 0; k < glowSparks.length; k += 3) {
+          const gx = glowSparks[k], gy = glowSparks[k + 1], gs = glowSparks[k + 2];
+          ctx.drawImage(glowSprite, gx - gs * 0.5, gy - gs * 0.5, gs, gs);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+
         orbState.rafId = requestAnimationFrame(renderOrb);
       }
 
@@ -604,60 +794,13 @@
         selectedVoiceName = localStorage.getItem('nadia_voice_name') || '';
       } catch (e) {}
 
-      let micAudioCtx = null;
-      let micMediaStream = null;
-      let micAnalyser = null;
-      let micDataArray = null;
-
-      function startMicAudioMeter() {
-        if (micAnalyser) return;
-        if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return;
-        navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
-          if (!isListening && !voiceConversationActive) {
-            stream.getTracks().forEach(function (tr) { tr.stop(); });
-            return;
-          }
-          micMediaStream = stream;
-          const AudioCtx = window.AudioContext || window.webkitAudioContext;
-          if (!AudioCtx) return;
-          micAudioCtx = new AudioCtx();
-          const source = micAudioCtx.createMediaStreamSource(stream);
-          micAnalyser = micAudioCtx.createAnalyser();
-          micAnalyser.fftSize = 256;
-          micAnalyser.smoothingTimeConstant = 0.72;
-          source.connect(micAnalyser);
-          micDataArray = new Uint8Array(micAnalyser.fftSize);
-        }).catch(function () {});
-      }
-
-      function stopMicAudioMeter() {
-        if (micMediaStream) {
-          try { micMediaStream.getTracks().forEach(function (tr) { tr.stop(); }); } catch (e) {}
-          micMediaStream = null;
-        }
-        if (micAudioCtx) {
-          try { micAudioCtx.close(); } catch (e) {}
-          micAudioCtx = null;
-        }
-        micAnalyser = null;
-        micDataArray = null;
-      }
-
-      function readMicVolumeLevel() {
-        if (!micAnalyser || !micDataArray) return -1;
-        micAnalyser.getByteTimeDomainData(micDataArray);
-        let sumSq = 0;
-        for (let i = 0; i < micDataArray.length; i++) {
-          const norm = (micDataArray[i] - 128) / 128;
-          sumSq += norm * norm;
-        }
-        const rms = Math.sqrt(sumSq / micDataArray.length);
-        return Math.min(1.0, Math.max(0.0, (rms - 0.012) * 7.2));
-      }
+      let activeUtterance = null;
+      let speakDelayTimer = null;
 
       function clearVoiceTimers() {
         if (silenceSendTimer) { clearTimeout(silenceSendTimer); silenceSendTimer = null; }
         if (resumeListenTimer) { clearTimeout(resumeListenTimer); resumeListenTimer = null; }
+        if (speakDelayTimer) { clearTimeout(speakDelayTimer); speakDelayTimer = null; }
       }
 
       function cleanTextForSpeech(text) {
@@ -731,6 +874,8 @@
       }
 
       function stopSpeaking() {
+        if (speakDelayTimer) { clearTimeout(speakDelayTimer); speakDelayTimer = null; }
+        activeUtterance = null;
         if ('speechSynthesis' in window) {
           try { window.speechSynthesis.cancel(); } catch (e) {}
         }
@@ -745,7 +890,7 @@
           if (voiceConversationActive && handsFreeEnabled && !appState.busy && !isListening && appState.activeTab === 'chat') {
             startMicListening(true);
           }
-        }, 480);
+        }, 520);
       }
 
       function speakText(rawText, options) {
@@ -760,23 +905,35 @@
           if (shouldResume) scheduleResumeListening();
           return;
         }
-        const utter = new SpeechSynthesisUtterance(spoken);
-        const v = pickPreferredVoice();
-        utter.lang = (v && v.lang) ? v.lang : 'th-TH';
-        utter.rate = speechRate;
-        utter.pitch = speechPitch;
-        if (v) utter.voice = v;
-        utter.onstart = function () { orbState.speakPulse = 0.85; setOrbMode('speaking'); };
-        utter.onboundary = function () { orbState.speakPulse = Math.min(1.0, orbState.speakPulse + 0.72); };
-        utter.onend = function () {
-          if (orbState.mode === 'speaking') setOrbMode('idle');
-          if (shouldResume) scheduleResumeListening();
-        };
-        utter.onerror = function () {
-          if (orbState.mode === 'speaking') setOrbMode('idle');
-          if (shouldResume) scheduleResumeListening();
-        };
-        window.speechSynthesis.speak(utter);
+        // Small delay after cancel() avoids Chromium bug where cancel() drops the newly queued utterance
+        speakDelayTimer = setTimeout(function () {
+          speakDelayTimer = null;
+          const utter = new SpeechSynthesisUtterance(spoken);
+          activeUtterance = utter;
+          const v = pickPreferredVoice();
+          utter.lang = (v && v.lang) ? v.lang : 'th-TH';
+          utter.rate = speechRate;
+          utter.pitch = speechPitch;
+          if (v) utter.voice = v;
+          let finished = false;
+          function finishSpeak() {
+            if (finished) return;
+            finished = true;
+            if (activeUtterance === utter) activeUtterance = null;
+            if (orbState.mode === 'speaking') setOrbMode('idle');
+            if (shouldResume) scheduleResumeListening();
+          }
+          utter.onstart = function () { orbState.speakPulse = 0.85; setOrbMode('speaking'); };
+          utter.onboundary = function () { orbState.speakPulse = Math.min(1.0, orbState.speakPulse + 0.72); };
+          utter.onend = finishSpeak;
+          utter.onerror = finishSpeak;
+          try {
+            window.speechSynthesis.resume();
+            window.speechSynthesis.speak(utter);
+          } catch (e) {
+            finishSpeak();
+          }
+        }, 70);
       }
 
       if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) {
@@ -836,8 +993,6 @@
         viewMemory: document.getElementById('viewMemory'),
         viewSettings: document.getElementById('viewSettings'),
         orbStage: document.getElementById('orbStage'),
-        scrollToChatBtn: document.getElementById('scrollToChatBtn'),
-        quickChips: document.getElementById('quickChips'),
         chatStream: document.getElementById('chatStream'),
         messagesList: document.getElementById('messagesList'),
         input: document.getElementById('messageInput'),
@@ -1006,21 +1161,15 @@
         if (voiceConversationActive) {
           el.orbStage.classList.remove('hero', 'compact');
           el.orbStage.classList.add('voice-focus');
-          el.quickChips.classList.add('hidden');
-          if (el.scrollToChatBtn) el.scrollToChatBtn.classList.toggle('hidden', !appState.hasMessages);
           if (scrollTopOnVoice) {
             el.chatStream.scrollTo({ top: 0, behavior: 'smooth' });
           }
         } else if (appState.hasMessages) {
           el.orbStage.classList.remove('hero', 'voice-focus');
           el.orbStage.classList.add('compact');
-          el.quickChips.classList.add('hidden');
-          if (el.scrollToChatBtn) el.scrollToChatBtn.classList.add('hidden');
         } else {
           el.orbStage.classList.remove('compact', 'voice-focus');
           el.orbStage.classList.add('hero');
-          el.quickChips.classList.remove('hidden');
-          if (el.scrollToChatBtn) el.scrollToChatBtn.classList.add('hidden');
         }
         setTimeout(resizeCanvas, 120);
         setTimeout(resizeCanvas, 380);
@@ -1092,7 +1241,6 @@
         if (!fromVoice) {
           voiceConversationActive = false;
           clearVoiceTimers();
-          stopMicAudioMeter();
           updateChatLayout(false);
         }
         if (appState.activeTab !== 'chat') switchTab('chat');
@@ -1126,6 +1274,7 @@
               }
             } else {
               voiceConversationActive = false;
+              updateChatLayout(false);
               setOrbMode('idle');
               appendMessage('error', (res && res.error) ? res.error : 'เชื่อมต่อไม่สำเร็จค่ะ');
             }
@@ -1133,6 +1282,7 @@
             appState.busy = false;
             el.sendBtn.disabled = false;
             voiceConversationActive = false;
+            updateChatLayout(false);
             setOrbMode('idle');
             appendMessage('error', 'เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + (err.message || err));
           }
@@ -1167,7 +1317,7 @@
 
       function commitVoiceTranscript() {
         if (silenceSendTimer) { clearTimeout(silenceSendTimer); silenceSendTimer = null; }
-        const spokenText = latestVoiceTranscript.trim();
+        const spokenText = (latestVoiceTranscript || el.input.value || '').trim();
         if (voiceSentForTurn || !spokenText || appState.busy) return;
         voiceSentForTurn = true;
         latestVoiceTranscript = '';
@@ -1192,12 +1342,15 @@
         recognition.continuous = false;
         recognition.onstart = function () {
           isListening = true;
+          orbState.listenPulse = 0.55;
           el.micBtn.classList.add('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
           setOrbMode('listening');
-          startMicAudioMeter();
           if (!isAutoResume) {
             showToast(handsFreeEnabled ? 'กำลังฟังค่ะ พูดจบแล้วส่งอัตโนมัติเลยนะคะ' : 'กำลังฟังอยู่ค่ะ พูดได้เลยนะคะ');
           }
+        };
+        recognition.onspeechstart = function () {
+          orbState.listenPulse = 0.95;
         };
         recognition.onresult = function (event) {
           let transcript = '', hasFinal = false;
@@ -1207,17 +1360,23 @@
           }
           latestVoiceTranscript = transcript.trim();
           el.input.value = latestVoiceTranscript;
+          orbState.listenPulse = Math.min(1.0, 0.72 + Math.random() * 0.28);
           if (silenceSendTimer) clearTimeout(silenceSendTimer);
           if (hasFinal && latestVoiceTranscript) {
             commitVoiceTranscript();
           } else if (latestVoiceTranscript) {
-            silenceSendTimer = setTimeout(commitVoiceTranscript, 1250);
+            silenceSendTimer = setTimeout(commitVoiceTranscript, 1100);
+          }
+        };
+        recognition.onspeechend = function () {
+          if (!voiceSentForTurn && (latestVoiceTranscript || el.input.value || '').trim()) {
+            if (silenceSendTimer) clearTimeout(silenceSendTimer);
+            silenceSendTimer = setTimeout(commitVoiceTranscript, 550);
           }
         };
         recognition.onerror = function (ev) {
           isListening = false;
           clearVoiceTimers();
-          stopMicAudioMeter();
           el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
           if (!appState.busy) setOrbMode('idle');
           const code = ev && ev.error ? ev.error : 'blocked';
@@ -1232,15 +1391,14 @@
         };
         recognition.onend = function () {
           isListening = false;
-          stopMicAudioMeter();
           el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
-          if (!voiceSentForTurn && latestVoiceTranscript.trim() && !appState.busy) {
+          if (!voiceSentForTurn && (latestVoiceTranscript || el.input.value || '').trim() && !appState.busy) {
             commitVoiceTranscript();
             return;
           }
           if (!appState.busy) setOrbMode('idle');
         };
-        try { recognition.start(); } catch (e) { isListening = false; voiceConversationActive = false; stopMicAudioMeter(); updateChatLayout(false); }
+        try { recognition.start(); } catch (e) { isListening = false; voiceConversationActive = false; updateChatLayout(false); }
       }
 
       function toggleMicListening() {
@@ -1251,7 +1409,6 @@
         if (isListening || voiceConversationActive) {
           voiceConversationActive = false;
           clearVoiceTimers();
-          stopMicAudioMeter();
           stopSpeaking();
           if (recognition && isListening) {
             try { recognition.stop(); } catch (e) {}
@@ -1308,16 +1465,10 @@
       el.micBtn.addEventListener('click', toggleMicListening);
       el.toggleToolsBtn.addEventListener('click', function () { el.toolsDrawer.classList.toggle('hidden'); });
       el.resetChatBtn.addEventListener('click', function () {
-        voiceConversationActive = false; clearVoiceTimers(); stopMicAudioMeter();
+        voiceConversationActive = false; clearVoiceTimers();
         if (recognition && isListening) { try { recognition.stop(); } catch (e) {} }
         stopSpeaking(); switchTab('chat'); el.messagesList.innerHTML = ''; setChatActive(false); setOrbMode('idle');
       });
-      if (el.scrollToChatBtn) {
-        el.scrollToChatBtn.addEventListener('click', function () {
-          const wrap = document.getElementById('messagesWrap');
-          if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      }
       if (typeof ResizeObserver !== 'undefined' && el.orbStage) {
         const orbRo = new ResizeObserver(function () { resizeCanvas(); });
         orbRo.observe(el.orbStage);
@@ -1335,13 +1486,10 @@
         btn.addEventListener('click', function () { sendMessage(btn.getAttribute('data-cmd')); });
       });
       document.getElementById('drawerAnalyzeBtn').addEventListener('click', function () { prefillCommand('/analyze '); });
-      document.getElementById('chipAnalyzeBtn').addEventListener('click', function () { prefillCommand('/analyze '); });
       document.getElementById('drawerMemoryBtn').addEventListener('click', function () { switchTab('memory'); });
       document.getElementById('drawerLedgerBtn').addEventListener('click', function () { openModal(el.ledgerModal); });
-      document.getElementById('chipLedgerBtn').addEventListener('click', function () { openModal(el.ledgerModal); });
       document.getElementById('plusActionBtn').addEventListener('click', function () { openModal(el.ledgerModal); });
       document.getElementById('drawerTaskBtn').addEventListener('click', function () { openModal(el.taskModal); });
-      document.getElementById('chipTaskBtn').addEventListener('click', function () { openModal(el.taskModal); });
       document.querySelectorAll('[data-close-modal]').forEach(function (btn) {
         btn.addEventListener('click', function () {
           const modal = document.getElementById(btn.getAttribute('data-close-modal'));
