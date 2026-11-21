@@ -1244,14 +1244,31 @@
         if (window.lucide) lucide.createIcons();
       }
 
+      function detachRecognition(rec) {
+        if (!rec) return;
+        rec.onstart = null;
+        rec.onspeechstart = null;
+        rec.onspeechend = null;
+        rec.onsoundend = null;
+        rec.onresult = null;
+        rec.onerror = null;
+        rec.onend = null;
+      }
+
       function commitVoiceTranscript() {
         if (silenceSendTimer) { clearTimeout(silenceSendTimer); silenceSendTimer = null; }
         const spokenText = (latestVoiceTranscript || el.input.value || '').trim();
         if (voiceSentForTurn || !spokenText || appState.busy) return;
         voiceSentForTurn = true;
         latestVoiceTranscript = '';
-        if (recognition && isListening) {
-          try { recognition.stop(); } catch (e) {}
+        el.input.value = '';
+        isListening = false;
+        el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
+        if (recognition) {
+          const oldRec = recognition;
+          recognition = null;
+          detachRecognition(oldRec);
+          try { oldRec.abort(); } catch (e) { try { oldRec.stop(); } catch (e2) {} }
         }
         sendMessage(spokenText, { fromVoice: true });
       }
@@ -1263,13 +1280,22 @@
         }
         clearVoiceTimers();
         stopSpeaking();
+        if (recognition) {
+          const prevRec = recognition;
+          recognition = null;
+          detachRecognition(prevRec);
+          try { prevRec.abort(); } catch (e) {}
+        }
         latestVoiceTranscript = '';
         voiceSentForTurn = false;
-        recognition = new SpeechRecognition();
-        recognition.lang = 'th-TH';
-        recognition.interimResults = true;
-        recognition.continuous = false;
-        recognition.onstart = function () {
+        el.input.value = '';
+        const rec = new SpeechRecognition();
+        recognition = rec;
+        rec.lang = 'th-TH';
+        rec.interimResults = true;
+        rec.continuous = false;
+        rec.onstart = function () {
+          if (recognition !== rec) return;
           isListening = true;
           orbState.listenPulse = 0.55;
           el.micBtn.classList.add('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
@@ -1278,35 +1304,58 @@
             showToast(handsFreeEnabled ? 'กำลังฟังค่ะ พูดจบแล้วส่งอัตโนมัติเลยนะคะ' : 'กำลังฟังอยู่ค่ะ พูดได้เลยนะคะ');
           }
         };
-        recognition.onspeechstart = function () {
+        rec.onspeechstart = function () {
+          if (recognition !== rec || voiceSentForTurn) return;
           orbState.listenPulse = 0.95;
         };
-        recognition.onresult = function (event) {
+        rec.onresult = function (event) {
+          if (recognition !== rec || voiceSentForTurn) return;
           let transcript = '', hasFinal = false;
           for (let i = 0; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript;
             if (event.results[i].isFinal) hasFinal = true;
           }
-          latestVoiceTranscript = transcript.trim();
-          el.input.value = latestVoiceTranscript;
+          const nextText = transcript.trim();
+          if (!nextText) return;
+          const textChanged = (nextText !== latestVoiceTranscript);
+          latestVoiceTranscript = nextText;
+          el.input.value = nextText;
           orbState.listenPulse = Math.min(1.0, 0.72 + Math.random() * 0.28);
-          if (silenceSendTimer) clearTimeout(silenceSendTimer);
-          if (hasFinal && latestVoiceTranscript) {
+
+          if (hasFinal) {
             commitVoiceTranscript();
-          } else if (latestVoiceTranscript) {
-            silenceSendTimer = setTimeout(commitVoiceTranscript, 1100);
+            return;
           }
-        };
-        recognition.onspeechend = function () {
-          if (!voiceSentForTurn && (latestVoiceTranscript || el.input.value || '').trim()) {
+          // Only reset silence timer when words actually change (prevents background-noise confidence updates from stalling auto-send!)
+          if (textChanged || !silenceSendTimer) {
             if (silenceSendTimer) clearTimeout(silenceSendTimer);
-            silenceSendTimer = setTimeout(commitVoiceTranscript, 550);
+            silenceSendTimer = setTimeout(commitVoiceTranscript, 950);
           }
         };
-        recognition.onerror = function (ev) {
+        rec.onspeechend = function () {
+          if (recognition !== rec || voiceSentForTurn) return;
+          if ((latestVoiceTranscript || el.input.value || '').trim()) {
+            if (silenceSendTimer) clearTimeout(silenceSendTimer);
+            silenceSendTimer = setTimeout(commitVoiceTranscript, 350);
+          }
+        };
+        rec.onsoundend = function () {
+          if (recognition !== rec || voiceSentForTurn) return;
+          if ((latestVoiceTranscript || el.input.value || '').trim()) {
+            if (silenceSendTimer) clearTimeout(silenceSendTimer);
+            silenceSendTimer = setTimeout(commitVoiceTranscript, 300);
+          }
+        };
+        rec.onerror = function (ev) {
+          if (recognition !== rec) return;
           isListening = false;
           clearVoiceTimers();
           el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
+          // If we already captured spoken words before an error, still auto-send them!
+          if (!voiceSentForTurn && (latestVoiceTranscript || el.input.value || '').trim() && !appState.busy) {
+            commitVoiceTranscript();
+            return;
+          }
           if (!appState.busy) setOrbMode('idle');
           const code = ev && ev.error ? ev.error : 'blocked';
           if (code === 'aborted') return;
@@ -1318,7 +1367,8 @@
             showToast('ไม่สามารถใช้ไมโครโฟนได้ (' + code + ') กรุณาอนุญาตสิทธิ์ไมค์ในเบราว์เซอร์นะคะ');
           }
         };
-        recognition.onend = function () {
+        rec.onend = function () {
+          if (recognition !== rec) return;
           isListening = false;
           el.micBtn.classList.remove('mic-listening', 'bg-emerald-500/20', 'text-emerald-300');
           if (!voiceSentForTurn && (latestVoiceTranscript || el.input.value || '').trim() && !appState.busy) {
@@ -1327,7 +1377,7 @@
           }
           if (!appState.busy) setOrbMode('idle');
         };
-        try { recognition.start(); } catch (e) { isListening = false; voiceConversationActive = false; updateChatLayout(false); }
+        try { rec.start(); } catch (e) { isListening = false; voiceConversationActive = false; updateChatLayout(false); }
       }
 
       function toggleMicListening() {
