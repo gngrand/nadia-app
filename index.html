@@ -384,24 +384,24 @@
         rafId: null
       };
 
-      // 16-step silky Emerald-Green gradient: Deep Forest-Teal -> Jade -> Emerald -> Mint -> Luminous Lime -> White-Mint
+      // 16-step 75% Emerald-Mint Green + 25% Deep Ocean/Cyan Blue palette (zero yellow!)
       const PALETTE_STOPS = [
-        [4, 44, 46],      // 0: Deep midnight-teal valley
-        [6, 68, 62],      // 1: Dark forest-jade
-        [8, 96, 78],      // 2: Deep emerald shadow
-        [10, 126, 94],    // 3: Rich jade-emerald
-        [14, 156, 110],   // 4: Pure emerald
-        [20, 184, 126],   // 5: Vibrant emerald
-        [34, 208, 140],   // 6: Bright emerald-mint
-        [56, 224, 150],   // 7: Glowing mint-emerald
-        [84, 236, 154],   // 8: Fresh mint-lime
-        [114, 244, 152],  // 9: Luminous spring-lime
-        [144, 250, 150],  // 10: Electric lime-green
-        [174, 254, 156],  // 11: Radiant chartreuse-mint
-        [198, 255, 176],  // 12: Bright luminous lime-mint
-        [218, 255, 202],  // 13: Pale mint-lime crest
-        [234, 255, 226],  // 14: Soft white-mint glow
-        [246, 255, 244]   // 15: Peak starlight mint-white
+        [8, 32, 98],      // 0: Deep sapphire-blue shadow valley (25% blue base)
+        [10, 58, 138],    // 1: Rich cobalt-ocean blue
+        [12, 92, 166],    // 2: Luminous cyan-blue
+        [12, 128, 164],   // 3: Deep ocean-teal transition
+        [12, 152, 142],   // 4: Rich blue-emerald (75% green spectrum starts)
+        [14, 174, 132],   // 5: Deep emerald jade
+        [18, 194, 132],   // 6: Pure vivid emerald
+        [28, 210, 138],   // 7: Bright emerald green
+        [44, 224, 148],   // 8: Glowing emerald-mint
+        [68, 235, 162],   // 9: Fresh luminous mint-green
+        [98, 243, 178],   // 10: Radiant aqua-mint green
+        [130, 248, 196],  // 11: Bright seafoam-mint crest
+        [164, 252, 214],  // 12: Crisp ice-mint highlight
+        [196, 254, 230],  // 13: Pale crystalline mint
+        [224, 255, 244],  // 14: Cool white-mint sheen
+        [244, 255, 252]   // 15: Peak starlight ice-mint
       ];
 
       // Pre-render 48x48 ultra-crisp anti-aliased round sphere dot sprites (zero pixelation!)
@@ -423,14 +423,25 @@
         return sc;
       });
 
-      // High-density ordered topographic UV sphere (74 latitude bands x 132 longitude steps = ~6,200 silky aligned dots)
-      const LAT_BANDS = 74;
-      const LON_STEPS = 132;
+      // Ultra-smooth high-density topographic UV sphere (102 latitude bands x 180 longitude steps = ~11,500 silky aligned dots)
+      const LAT_BANDS = 102;
+      const LON_STEPS = 180;
       const points = [];
-      for (let i = 2; i < LAT_BANDS - 1; i++) {
+      // Exact north & south pole vertices + tight polar caps so the sphere has ZERO holes
+      points.push({ nx: 0, ny: 1, nz: 0 });
+      points.push({ nx: 0, ny: -1, nz: 0 });
+      for (let capIdx = 0; capIdx < 2; capIdx++) {
+        const theta = capIdx === 0 ? (0.48 / LAT_BANDS) * Math.PI : ((LAT_BANDS - 0.48) / LAT_BANDS) * Math.PI;
+        const sinT = Math.sin(theta), cosT = Math.cos(theta);
+        for (let j = 0; j < 6; j++) {
+          const phi = (j / 6) * Math.PI * 2;
+          points.push({ nx: sinT * Math.cos(phi), ny: cosT, nz: sinT * Math.sin(phi) });
+        }
+      }
+      for (let i = 1; i < LAT_BANDS; i++) {
         const theta = (i / LAT_BANDS) * Math.PI;
         const sinT = Math.sin(theta), cosT = Math.cos(theta);
-        const ringCount = Math.max(16, Math.round(LON_STEPS * sinT));
+        const ringCount = Math.max(8, Math.round(LON_STEPS * sinT));
         for (let j = 0; j < ringCount; j++) {
           const phi = (j / ringCount) * Math.PI * 2;
           points.push({
@@ -446,8 +457,8 @@
         projected[i] = { x: 0, y: 0, z: 0, depth: 0, rNorm: 1, nx: 0, ny: 0, nz: 0 };
       }
 
-      // Living Particle Aura: 260 silky emerald-lime motes radiating gently outward from the orb
-      const AURA_COUNT = 260;
+      // Living Particle Aura: 340 silky emerald-lime motes drifting gracefully outward from the orb
+      const AURA_COUNT = 340;
       const auraMotes = new Array(AURA_COUNT);
       function resetAuraMote(m, randomLife) {
         const u = Math.random() * 2 - 1;
@@ -461,7 +472,7 @@
         m.maxDrift = 0.28 + Math.random() * 0.42;
         m.swirl = (Math.random() - 0.5) * 0.65;
         m.size = 1.3 + Math.random() * 2.1;
-        m.colorIdx = 7 + Math.floor(Math.random() * 8);
+        m.colorIdx = (Math.random() < 0.25) ? (2 + Math.floor(Math.random() * 3)) : (6 + Math.floor(Math.random() * 8));
       }
       for (let a = 0; a < AURA_COUNT; a++) {
         auraMotes[a] = {};
@@ -483,32 +494,50 @@
         orbState.mode = mode;
         if (mode === 'thinking') {
           orbState.targetEnergy = 0.95;
-          el.statusDot.classList.add('scale-125', 'bg-lime-300');
+          el.statusDot.classList.add('scale-125', 'bg-cyan-300');
         } else if (mode === 'listening') {
           orbState.targetEnergy = 0.78;
-          el.statusDot.classList.add('scale-125', 'bg-lime-300');
+          el.statusDot.classList.add('scale-125', 'bg-cyan-300');
         } else if (mode === 'speaking') {
           orbState.targetEnergy = 0.68;
-          el.statusDot.classList.remove('scale-125', 'bg-lime-300');
+          el.statusDot.classList.remove('scale-125', 'bg-cyan-300');
         } else {
           orbState.targetEnergy = 0.0;
-          el.statusDot.classList.remove('scale-125', 'bg-lime-300');
+          el.statusDot.classList.remove('scale-125', 'bg-cyan-300');
         }
       }
 
-      // Sculptural multi-lobed billowing waves matching IMG_1977's iconic scalloped contour ridges
-      function waveDisplacement(nx, ny, nz, t, amp, energy, voiceAmp) {
-        const w1 = Math.sin(nx * 3.4 + t * 0.68) * Math.cos(ny * 3.2 - t * 0.56);
-        const w2 = Math.sin(nz * 3.6 - t * 0.62) * Math.sin((nx - ny) * 3.0 + t * 0.48);
-        const w3 = Math.cos((ny * 4.2 + nz * 3.8 - nx * 2.6) + t * 0.82) * 0.62;
-        const lobe = Math.sin((nx * ny * 5.2) + (nz * 4.0) - t * 0.74) * 0.48;
-        const ripple = Math.sin((nx * 5.5 + ny * 5.0 + nz * 4.8) - t * 1.65) * (0.045 + energy * 0.05);
-        const vocal = voiceAmp > 0.01
-          ? (Math.sin((nx * 4.8 + ny * 4.4 - nz * 4.6) + t * 6.4) * 0.14 + Math.cos((ny * 5.4 - nz * 4.2) - t * 5.0) * 0.07) * voiceAmp
+      // 3-State Multi-Frequency Organic Motion:
+      // 1) Idle: calm, rhythmic breathing cycle
+      // 2) Thinking: distinct focused neural-harmonic interference frequency
+      // 3) Speaking / Listening: rapid, lively vocal cadence ripples synced to speech
+      function waveDisplacement(nx, ny, nz, t, amp, energy, voiceAmp, thinkLevel, thinkPhase) {
+        // Calm idle breathing base + silky sculptural folds
+        const idleBreath = Math.sin(t * 0.62) * 0.048 + Math.sin(t * 1.24) * 0.012;
+        const w1 = Math.sin(nx * 3.1 + t * 0.55) * Math.cos(ny * 2.9 - t * 0.48);
+        const w2 = Math.sin(nz * 3.3 - t * 0.52) * Math.sin((nx - ny) * 2.7 + t * 0.44);
+        const w3 = Math.cos((ny * 3.8 + nz * 3.5 - nx * 2.4) + t * 0.68) * 0.55;
+        const silkFlow = Math.sin((nx * 3.5 + ny * 3.2 - nz * 2.7) - t * 0.95) * 0.055;
+        const lobe = Math.sin((nx * ny * 4.5) + (nz * 3.6) - t * 0.60) * 0.40;
+
+        // Distinct THINKING frequency: structured high-order neural harmonic waves
+        const thinkWave = thinkLevel > 0.02
+          ? (Math.sin((nx * 6.8 + ny * 6.2 - nz * 6.4) + thinkPhase * 1.35) * 0.095 +
+             Math.cos((nx * 4.5 - ny * 7.2 + nz * 5.6) - thinkPhase * 1.85) * 0.065) * thinkLevel
           : 0;
-        const breath = Math.sin(t * 0.95) * 0.032 + voiceAmp * 0.11;
-        return 0.93 + breath + (w1 * 0.18 + w2 * 0.15 + w3 * 0.095 + lobe * 0.08) * amp + ripple + vocal;
+
+        // Distinct SPEAKING frequency: rapid, elastic vocal flutter synced to spoken cadence
+        const vocalWave = voiceAmp > 0.01
+          ? (Math.sin((nx * 5.2 + ny * 4.8 - nz * 5.0) + t * 8.4) * 0.145 +
+             Math.cos((ny * 6.2 - nz * 4.6) - t * 6.8) * 0.085) * voiceAmp
+          : 0;
+
+        return 0.93 + idleBreath + voiceAmp * 0.11 + silkFlow +
+          (w1 * 0.17 + w2 * 0.14 + w3 * 0.085 + lobe * 0.07) * amp +
+          thinkWave + vocalWave;
       }
+
+      orbState.thinkLevel = 0.0;
 
       function renderOrb() {
         const rect = canvas.getBoundingClientRect();
@@ -516,19 +545,21 @@
         if (w < 2 || h < 2) { orbState.rafId = requestAnimationFrame(renderOrb); return; }
 
         orbState.energy += (orbState.targetEnergy - orbState.energy) * 0.08;
+        orbState.thinkLevel += ((orbState.mode === 'thinking' ? 1.0 : 0.0) - orbState.thinkLevel) * 0.08;
         orbState.mouseX += (orbState.targetMouseX - orbState.mouseX) * 0.06;
         orbState.mouseY += (orbState.targetMouseY - orbState.mouseY) * 0.06;
 
         if (orbState.mode === 'listening') {
-          orbState.listenPulse *= 0.91;
-          const listenBase = 0.18 + 0.16 * Math.abs(Math.sin(orbState.time * 4.0));
+          orbState.listenPulse *= 0.90;
+          const listenBase = 0.20 + 0.18 * Math.abs(Math.sin(orbState.time * 4.6));
           const targetV = Math.min(1.0, listenBase + orbState.listenPulse * 0.85);
-          orbState.voiceAmp += (targetV - orbState.voiceAmp) * 0.26;
+          orbState.voiceAmp += (targetV - orbState.voiceAmp) * 0.28;
         } else if (orbState.mode === 'speaking') {
-          orbState.speakPulse *= 0.88;
-          const cadence = 0.25 + 0.38 * Math.abs(Math.sin(orbState.time * 4.8)) * (0.62 + 0.38 * Math.sin(orbState.time * 10.8));
-          const targetS = Math.min(1.0, cadence + orbState.speakPulse * 0.62);
-          orbState.voiceAmp += (targetS - orbState.voiceAmp) * 0.24;
+          orbState.speakPulse *= 0.86;
+          // Higher-frequency lively vocal cadence while answering
+          const cadence = 0.28 + 0.42 * Math.abs(Math.sin(orbState.time * 6.8)) * (0.58 + 0.42 * Math.sin(orbState.time * 14.5));
+          const targetS = Math.min(1.0, cadence + orbState.speakPulse * 0.68);
+          orbState.voiceAmp += (targetS - orbState.voiceAmp) * 0.28;
         } else {
           orbState.listenPulse *= 0.86;
           orbState.speakPulse *= 0.85;
@@ -537,15 +568,18 @@
 
         const e = orbState.energy;
         const va = orbState.voiceAmp;
-        orbState.time += 0.0135 + e * 0.032 + va * 0.042;
-        orbState.thinkPhase += 0.05 + e * 0.11 + va * 0.14;
+        const tl = orbState.thinkLevel;
+
+        // Distinct time progression per mode: calm breathing (idle) vs neural spin (thinking) vs brisk lively pulse (speaking)
+        orbState.time += 0.0115 + tl * 0.018 + va * 0.048;
+        orbState.thinkPhase += 0.032 + tl * 0.145;
         if (!orbState.isDragging) {
-          orbState.rotY += 0.0038 + e * 0.015 + va * 0.018;
-          orbState.rotX = 0.22 + Math.sin(orbState.time * 0.44) * 0.18;
+          orbState.rotY += 0.0028 + tl * 0.016 + va * 0.012;
+          orbState.rotX = 0.22 + Math.sin(orbState.time * 0.42) * (0.16 + tl * 0.12);
         }
 
         const t = orbState.time;
-        const amp = 1.0 + e * 0.36 + va * 0.54;
+        const amp = 1.0 + tl * 0.26 + va * 0.58;
         const cx = w * 0.5, cy = h * 0.5;
         const baseRadius = Math.min(w, h) * 0.39;
         const fov = baseRadius * 3.5;
@@ -553,11 +587,11 @@
         ctx.globalCompositeOperation = 'source-over';
         ctx.clearRect(0, 0, w, h);
 
-        // Luminous emerald-mint atmospheric aura backlight behind the orb
-        const halo = ctx.createRadialGradient(cx, cy, baseRadius * 0.05, cx, cy, baseRadius * (1.52 + e * 0.24 + va * 0.30));
-        halo.addColorStop(0.0, 'rgba(16, 185, 129, ' + (0.18 + e * 0.08 + va * 0.11).toFixed(3) + ')');
-        halo.addColorStop(0.38, 'rgba(52, 211, 153, ' + (0.10 + e * 0.06 + va * 0.09).toFixed(3) + ')');
-        halo.addColorStop(0.72, 'rgba(6, 95, 70, 0.035)');
+        // Dimensional 75% Emerald Green + 25% Deep Ocean-Blue atmospheric backlight
+        const halo = ctx.createRadialGradient(cx, cy, baseRadius * 0.05, cx, cy, baseRadius * (1.54 + tl * 0.22 + va * 0.32));
+        halo.addColorStop(0.0, 'rgba(14, 116, 174, ' + (0.20 + tl * 0.10 + va * 0.08).toFixed(3) + ')');
+        halo.addColorStop(0.36, 'rgba(16, 185, 129, ' + (0.13 + tl * 0.06 + va * 0.10).toFixed(3) + ')');
+        halo.addColorStop(0.70, 'rgba(52, 211, 153, ' + (0.045 + va * 0.04).toFixed(3) + ')');
         halo.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = halo;
         ctx.fillRect(0, 0, w, h);
@@ -569,7 +603,7 @@
 
         for (let i = 0; i < POINT_COUNT; i++) {
           const p = points[i];
-          const rNorm = waveDisplacement(p.nx, p.ny, p.nz, t, amp, e, va);
+          const rNorm = waveDisplacement(p.nx, p.ny, p.nz, t, amp, e, va, tl, orbState.thinkPhase);
           const r = baseRadius * rNorm;
           const x0 = p.nx * r, y0 = p.ny * r, z0 = p.nz * r;
           const x1 = x0 * cosY - z0 * sinY;
@@ -583,9 +617,13 @@
           slot.z = z2;
           slot.depth = (z2 + baseRadius * 1.48) / (baseRadius * 2.96);
           slot.rNorm = rNorm;
-          // Approximate grazing / Fresnel angle from rotated normal z component
-          const rnz = (p.nx * sinY + p.nz * cosY) * cosX + p.ny * sinX;
+          // Rotated normal for Fresnel grazing rim + directional 3D key-light shading
+          const rnx = p.nx * cosY - p.nz * sinY;
+          const rzTmp = p.nx * sinY + p.nz * cosY;
+          const rny = p.ny * cosX - rzTmp * sinX;
+          const rnz = p.ny * sinX + rzTmp * cosX;
           slot.rim = 1.0 - Math.abs(rnz);
+          slot.light = Math.max(-0.35, Math.min(0.45, (-rnx * 0.48 - rny * 0.62 - rnz * 0.25) * 0.42));
         }
 
         // Back-to-front painter's sort so front lobes cleanly layer over back contours
@@ -598,11 +636,11 @@
           // Color driver: deep indigo-violet in front center valleys -> blazing orange-gold on outer crests & grazing rims!
           const ridgeHeat = Math.max(0, (pt.rNorm - 0.74) * 1.75);
           const rimHeat = Math.pow(Math.max(0, Math.min(1, pt.rim)), 1.08) * 1.05;
-          const colorPos = Math.max(0.06, Math.min(0.999,
-            ridgeHeat * 0.54 + rimHeat * 0.62 - frontness * 0.20 + e * 0.08 + va * 0.14
+          const colorPos = Math.max(0.0, Math.min(0.999,
+            ridgeHeat * 0.52 + rimHeat * 0.60 + (pt.light || 0) * 0.45 - frontness * 0.26 + e * 0.08 + va * 0.14
           ));
           const spriteIdx = Math.floor(colorPos * PALETTE_STOPS.length);
-          const d = Math.max(2.0, (2.05 + frontness * 1.65 + ridgeHeat * 0.95 + va * 0.48) * sizeScale);
+          const d = Math.max(1.55, (1.58 + frontness * 1.28 + ridgeHeat * 0.74 + va * 0.38) * sizeScale);
           ctx.globalAlpha = Math.max(0.32, Math.min(1.0, 0.40 + frontness * 0.52 + rimHeat * 0.30 + ridgeHeat * 0.18));
           ctx.drawImage(dotSprites[spriteIdx], pt.x - d * 0.5, pt.y - d * 0.5, d, d);
         }
