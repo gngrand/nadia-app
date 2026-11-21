@@ -802,8 +802,8 @@
               stopBargeInMonitor();
               return;
             }
-            // 550ms grace period so initial TTS audio doesn't false-trigger
-            if (Date.now() - startedAt < 550) return;
+            // 900ms grace period so initial speaker output doesn't false-trigger
+            if (Date.now() - startedAt < 900) return;
             analyser.getByteTimeDomainData(buf);
             let sumSq = 0;
             for (let i = 0; i < buf.length; i++) {
@@ -811,9 +811,9 @@
               sumSq += norm * norm;
             }
             const rms = Math.sqrt(sumSq / buf.length);
-            if (rms > 0.085) {
+            if (rms > 0.115) {
               hotFrames++;
-              if (hotFrames >= 4) {
+              if (hotFrames >= 5) {
                 // Release VAD mic stream cleanly BEFORE opening SpeechRecognition
                 stopBargeInMonitor();
                 interruptAndListen();
@@ -901,9 +901,44 @@
         }
       }
 
+      let speechUnlocked = false;
+      let speakSessionId = 0;
+      let speakWatchdogTimer = null;
+
+      function unlockSpeechSynthesis() {
+        if (speechUnlocked || !('speechSynthesis' in window)) return;
+        speechUnlocked = true;
+        try {
+          const u = new SpeechSynthesisUtterance(' ');
+          u.volume = 0;
+          u.rate = 10;
+          window.speechSynthesis.speak(u);
+          window.speechSynthesis.resume();
+        } catch (e) {}
+      }
+
+      function splitIntoSpeechChunks(text, maxLen) {
+        const chunks = [];
+        const rawLines = String(text || '').split(/(?:\n+|[.!?。]+\s*)/);
+        rawLines.forEach(function (segment) {
+          let s = segment.trim();
+          if (!s) return;
+          while (s.length > maxLen) {
+            let cut = s.lastIndexOf(' ', maxLen);
+            if (cut < Math.floor(maxLen * 0.45)) cut = maxLen;
+            chunks.push(s.slice(0, cut).trim());
+            s = s.slice(cut).trim();
+          }
+          if (s) chunks.push(s);
+        });
+        return chunks.length ? chunks : [String(text || '').trim()].filter(Boolean);
+      }
+
       function stopSpeaking() {
+        speakSessionId++;
         stopBargeInMonitor();
         if (speakDelayTimer) { clearTimeout(speakDelayTimer); speakDelayTimer = null; }
+        if (speakWatchdogTimer) { clearTimeout(speakWatchdogTimer); speakWatchdogTimer = null; }
         activeUtterance = null;
         if ('speechSynthesis' in window) {
           try { window.speechSynthesis.cancel(); } catch (e) {}
@@ -929,45 +964,95 @@
           return;
         }
         stopSpeaking();
+        const mySession = speakSessionId;
         const spoken = cleanTextForSpeech(rawText);
         if (!spoken) {
           if (shouldResume) scheduleResumeListening();
           return;
         }
-        // Small delay after cancel() avoids Chromium bug where cancel() drops the newly queued utterance
-        speakDelayTimer = setTimeout(function () {
-          speakDelayTimer = null;
-          const utter = new SpeechSynthesisUtterance(spoken);
+        const chunks = splitIntoSpeechChunks(spoken, 155);
+        let chunkIndex = 0;
+
+        function finishAll() {
+          if (mySession !== speakSessionId) return;
+          if (speakWatchdogTimer) { clearTimeout(speakWatchdogTimer); speakWatchdogTimer = null; }
+          stopBargeInMonitor();
+          activeUtterance = null;
+          if (orbState.mode === 'speaking') setOrbMode('idle');
+          if (shouldResume) scheduleResumeListening();
+        }
+
+        function speakChunk(useFallbackVoice) {
+          if (mySession !== speakSessionId) return;
+          if (chunkIndex >= chunks.length) { finishAll(); return; }
+          const part = chunks[chunkIndex];
+          const utter = new SpeechSynthesisUtterance(part);
           activeUtterance = utter;
-          const v = pickPreferredVoice();
+          const v = useFallbackVoice ? null : pickPreferredVoice();
           utter.lang = (v && v.lang) ? v.lang : 'th-TH';
           utter.rate = speechRate;
           utter.pitch = speechPitch;
           if (v) utter.voice = v;
-          let finished = false;
-          function finishSpeak() {
-            if (finished) return;
-            finished = true;
-            stopBargeInMonitor();
-            if (activeUtterance === utter) activeUtterance = null;
-            if (orbState.mode === 'speaking') setOrbMode('idle');
-            if (shouldResume) scheduleResumeListening();
-          }
+
+          let started = false;
+          let handled = false;
+          if (speakWatchdogTimer) clearTimeout(speakWatchdogTimer);
+          // Watchdog recovers automatically if Chrome ever stalls mid-utterance
+          const estMs = Math.max(7000, Math.min(24000, part.length * 145 + 3500));
+          speakWatchdogTimer = setTimeout(function () {
+            if (mySession !== speakSessionId || handled) return;
+            handled = true;
+            try { window.speechSynthesis.cancel(); } catch (e) {}
+            chunkIndex++;
+            speakChunk(false);
+          }, estMs);
+
           utter.onstart = function () {
+            if (mySession !== speakSessionId) return;
+            started = true;
             orbState.speakPulse = 0.85;
             setOrbMode('speaking');
-            if (voiceConversationActive && voiceBargeInEnabled) startBargeInMonitor();
+            if (chunkIndex === 0 && voiceConversationActive && voiceBargeInEnabled) {
+              startBargeInMonitor();
+            }
           };
-          utter.onboundary = function () { orbState.speakPulse = Math.min(1.0, orbState.speakPulse + 0.72); };
-          utter.onend = finishSpeak;
-          utter.onerror = finishSpeak;
+          utter.onboundary = function () {
+            if (mySession !== speakSessionId) return;
+            orbState.speakPulse = Math.min(1.0, orbState.speakPulse + 0.72);
+          };
+          utter.onend = function () {
+            if (mySession !== speakSessionId || handled) return;
+            handled = true;
+            if (speakWatchdogTimer) { clearTimeout(speakWatchdogTimer); speakWatchdogTimer = null; }
+            chunkIndex++;
+            speakChunk(false);
+          };
+          utter.onerror = function () {
+            if (mySession !== speakSessionId || handled) return;
+            handled = true;
+            if (speakWatchdogTimer) { clearTimeout(speakWatchdogTimer); speakWatchdogTimer = null; }
+            // If custom voice failed before starting, retry once with default browser voice so Nadia never stays silent
+            if (!started && !useFallbackVoice && v) {
+              speakChunk(true);
+              return;
+            }
+            chunkIndex++;
+            speakChunk(false);
+          };
+
           try {
             window.speechSynthesis.resume();
             window.speechSynthesis.speak(utter);
           } catch (e) {
-            finishSpeak();
+            finishAll();
           }
-        }, 70);
+        }
+
+        // Small delay after cancel() avoids Chromium bug where cancel() drops the newly queued utterance
+        speakDelayTimer = setTimeout(function () {
+          speakDelayTimer = null;
+          speakChunk(false);
+        }, 80);
       }
 
       if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) {
@@ -1655,7 +1740,7 @@
       populateVoiceSelect();
         showToast(voiceReplyEnabled ? 'เปิดเสียงตอบกลับแล้วค่ะ' : 'ปิดเสียงตอบกลับแล้วค่ะ');
       });
-      el.micBtn.addEventListener('click', toggleMicListening);
+      el.micBtn.addEventListener('click', function () { unlockSpeechSynthesis(); toggleMicListening(); });
       el.toggleToolsBtn.addEventListener('click', function () { el.toolsDrawer.classList.toggle('hidden'); });
       el.resetChatBtn.addEventListener('click', function () {
         voiceConversationActive = false; clearVoiceTimers();
@@ -1666,7 +1751,7 @@
         const orbRo = new ResizeObserver(function () { resizeCanvas(); });
         orbRo.observe(el.orbStage);
       }
-      el.sendBtn.addEventListener('click', function () { sendMessage(); });
+      el.sendBtn.addEventListener('click', function () { unlockSpeechSynthesis(); sendMessage(); });
       el.input.addEventListener('input', function () {
         if (isNadiaSpeaking() && el.input.value.trim()) stopSpeaking();
         el.input.style.height = 'auto';
